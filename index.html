@@ -17,6 +17,7 @@
             <p class="text-indigo-200 text-sm mt-1">Confirmación y Gestión de Invitados</p>
         </header>
 
+        <!-- PANTALLA 1: LOGIN -->
         <div id="pantalla-login" class="p-6 flex-grow flex flex-col justify-center items-center">
             <div class="w-full space-y-4">
                 <div class="text-center mb-6">
@@ -32,6 +33,7 @@
             </div>
         </div>
 
+        <!-- PANTALLA 2: FORMULARIO -->
         <div id="pantalla-formulario" class="p-6 flex-grow hidden space-y-6">
             <div class="bg-indigo-50 p-4 rounded-xl border border-indigo-100">
                 <span class="text-xs uppercase font-bold text-indigo-500 tracking-wider">Titular Autorizado</span>
@@ -51,6 +53,7 @@
                     </button>
                 </div>
 
+                <!-- CASILLA: ZONA HABILITADA DISCAPACIDAD -->
                 <div class="bg-blue-50 p-4 rounded-xl border border-blue-200 mt-4">
                     <div class="flex items-start">
                         <div class="flex items-center h-5">
@@ -65,6 +68,7 @@
                     </div>
                 </div>
 
+                <!-- CASILLA LEGAL LOPD -->
                 <div class="bg-gray-50 p-4 rounded-xl border border-gray-200">
                     <div class="flex items-start">
                         <div class="flex items-center h-5">
@@ -97,10 +101,42 @@
         let usuarioDni = "";
         let maxAcompanantesHistoricos = 0;
 
+        // FUNCIÓN MATEMÁTICA PARA VALIDAR EL FORMATO Y LA LETRA DEL DNI/NIE
+        function validarDniNie(documento) {
+            const regex = /^[XYZ\d]\d{7}[A-Z]$/i;
+            if (!regex.test(documento)) return false;
+
+            let stringDni = documento.toUpperCase();
+            // Adaptación para NIEs (X=0, Y=1, Z=2)
+            stringDni = stringDni
+                .replace(/^X/, '0')
+                .replace(/^Y/, '1')
+                .replace(/^Z/, '2');
+
+            const numero = parseInt(stringDni.substr(0, 8), 10);
+            const letraIntroducida = stringDni.substr(8, 1);
+            const letrasValidas = "TRWAGMYFPDXBNJZSQVHLCKE";
+            const letraCorrecta = letrasValidas.charAt(numero % 23);
+
+            return letraIntroducida === letraCorrecta;
+        }
+
         async function verificarAcceso() {
             const inputDni = document.getElementById('login-dni').value.trim().toUpperCase();
+            
             if(!inputDni) {
                 Swal.fire('Atención', 'Por favor, escribe tu DNI.', 'warning');
+                return;
+            }
+
+            // COMPROBACIÓN ANTES DE IR A LA BASE DE DATOS
+            if (!validarDniNie(inputDni)) {
+                Swal.fire({
+                    title: 'Formato incorrecto',
+                    text: 'El número o la letra del documento no son válidos. Por favor, compruébalo.',
+                    icon: 'error',
+                    confirmButtonColor: '#ef4444'
+                });
                 return;
             }
 
@@ -114,7 +150,7 @@
                     .maybeSingle();
 
                 if (error || !titular) {
-                    Swal.fire('No encontrado', 'El DNI introducido no consta en la lista de autorizados.', 'error');
+                    Swal.fire('No encontrado', 'El DNI introducido es válido pero no consta en la lista de autorizados.', 'error');
                     return;
                 }
 
@@ -145,7 +181,6 @@
             maxAcompanantesHistoricos = existentes ? existentes.length : 0;
             const activos = existentes ? existentes.filter(inv => inv.nombre && inv.nombre.trim() !== "") : [];
 
-            // Si ya tenían datos guardados, comprobamos si alguno tenía marcada la casilla de zona habilitada
             if (existentes && existentes.length > 0) {
                 const algunDiscapacitado = existentes.some(inv => inv.zona_discapacidad === true);
                 document.getElementById('check-discapacidad').checked = algunDiscapacitado;
@@ -216,9 +251,7 @@
                 return;
             }
 
-            // LEEMOS EL ESTADO DE LA CASILLA DE ACCESO ADAPTADO
             const requiereZonaAdaptada = document.getElementById('check-discapacidad').checked;
-
             Swal.fire({ title: 'Guardando cambios...', didOpen: () => Swal.showLoading(), allowOutsideClick: false });
 
             const tarjetas = document.getElementsByClassName('tarjeta-dinamica');
@@ -238,7 +271,7 @@
                         parentesco: "Otros",
                         es_excepcion: esExcepcion,
                         motivo_excepcion: null,
-                        zona_discapacidad: false // Si se borra la tarjeta, se limpia el valor
+                        zona_discapacidad: false
                     });
                     continue;
                 }
@@ -259,6 +292,12 @@
                         return;
                     }
 
+                    // ADVERTENCIA OPCIONAL PARA EL DNI DEL ACOMPAÑANTE
+                    if (dni && !validarDniNie(dni)) {
+                        Swal.fire('DNI de Acompañante no válido', `La letra del DNI introducido para el acompañante ${nombre} no es correcta. Por favor, revísala antes de continuar.`, 'warning');
+                        return;
+                    }
+
                     listaParaUpsert.push({
                         titular_dni: usuarioDni,
                         numero_acompanante: numPosicion,
@@ -268,7 +307,6 @@
                         parentesco: parentesco,
                         es_excepcion: esExcepcion,
                         motivo_excepcion: motivo,
-                        // REGLA CLAVE: Se le asigna el valor general del interruptor a todos los miembros activos
                         zona_discapacidad: requiereZonaAdaptada 
                     });
                 }
