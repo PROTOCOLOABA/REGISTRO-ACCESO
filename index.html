@@ -17,7 +17,6 @@
             <p class="text-indigo-200 text-sm mt-1">Confirmación y Gestión de Invitados</p>
         </header>
 
-        <!-- PANTALLA 1: LOGIN -->
         <div id="pantalla-login" class="p-6 flex-grow flex flex-col justify-center items-center">
             <div class="w-full space-y-4">
                 <div class="text-center mb-6">
@@ -33,7 +32,6 @@
             </div>
         </div>
 
-        <!-- PANTALLA 2: FORMULARIO -->
         <div id="pantalla-formulario" class="p-6 flex-grow hidden space-y-6">
             <div class="bg-indigo-50 p-4 rounded-xl border border-indigo-100">
                 <span class="text-xs uppercase font-bold text-indigo-500 tracking-wider">Titular Autorizado</span>
@@ -44,14 +42,12 @@
             <form id="form-invitados" onsubmit="guardarDatos(event)" class="space-y-6">
                 <div id="lista-invitados" class="space-y-4"></div>
 
-                <!-- BOTONERA: Se ha eliminado por completo el botón de Acompañante Base -->
                 <div class="flex justify-center">
                     <button type="button" onclick="crearTarjetaEnPantalla(true, null)" class="w-full border-2 border-dashed border-amber-400 text-amber-800 bg-amber-50 font-bold p-3 rounded-xl flex items-center justify-center gap-2 hover:bg-amber-100 transition-colors text-sm shadow-sm">
                         <span>➕ Solicitar Caso Excepcional</span>
                     </button>
                 </div>
 
-                <!-- CASILLA: ZONA HABILITADA DISCAPACIDAD -->
                 <div class="bg-blue-50 p-4 rounded-xl border border-blue-200 mt-4">
                     <div class="flex items-start">
                         <div class="flex items-center h-5">
@@ -66,7 +62,6 @@
                     </div>
                 </div>
 
-                <!-- CASILLA LEGAL LOPD -->
                 <div class="bg-gray-50 p-4 rounded-xl border border-gray-200">
                     <div class="flex items-start">
                         <div class="flex items-center h-5">
@@ -174,19 +169,17 @@
                 .order('numero_acompanante', { ascending: true });
 
             maxAcompanantesHistoricos = existentes ? existentes.length : 0;
-            const activos = existentes ? existentes.filter(inv => inv.nombre && inv.nombre.trim() !== "") : [];
 
             if (existentes && existentes.length > 0) {
                 const algunDiscapacitado = existentes.some(inv => inv.zona_discapacidad === true);
                 document.getElementById('check-discapacidad').checked = algunDiscapacitado;
-            }
 
-            if (activos.length > 0) {
-                activos.forEach(inv => {
+                // Pintamos lo que ya hay en la base de datos respetando si es base o excepción
+                existentes.forEach(inv => {
                     crearTarjetaEnPantalla(inv.es_excepcion, inv, inv.numero_acompanante);
                 });
             } else {
-                // Al entrar de cero, forzamos siempre la aparición de los 2 pases base reglamentarios
+                // Si entra de cero por primera vez, le pintamos obligatoriamente sus 2 pases base y fijamos el contador
                 crearTarjetaEnPantalla(false, null, 1);
                 crearTarjetaEnPantalla(false, null, 2);
                 maxAcompanantesHistoricos = 2;
@@ -206,7 +199,7 @@
             card.dataset.esExcepcion = esExcepcion;
             card.dataset.numeroAcompanante = numeroFijo;
 
-            // En las tarjetas base (no excepciones) quitamos el botón visual de eliminar para mantener las 2 plazas asignadas en pantalla
+            // Solo los casos excepcionales se pueden eliminar de la pantalla
             const botonEliminar = esExcepcion 
                 ? `<button type="button" onclick="marcarComoEliminado(this)" class="text-red-500 font-bold text-xs bg-red-50 px-2 py-1 rounded-lg border border-red-200">Eliminar</button>`
                 : '';
