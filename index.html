@@ -38,18 +38,16 @@
             <div class="bg-indigo-50 p-4 rounded-xl border border-indigo-100">
                 <span class="text-xs uppercase font-bold text-indigo-500 tracking-wider">Titular Autorizado</span>
                 <h2 id="nombre-titular" class="text-xl font-bold text-gray-800">Cargando...</h2>
-                <p class="text-xs text-gray-500 mt-1">Gestiona tus acompañantes libres. Puedes añadir o eliminar tarjetas según necesites.</p>
+                <p class="text-xs text-gray-500 mt-1">Gestiona tus acompañantes asignados. Puedes rellenar tus pases base o solicitar una excepción si fuera necesario.</p>
             </div>
 
             <form id="form-invitados" onsubmit="guardarDatos(event)" class="space-y-6">
                 <div id="lista-invitados" class="space-y-4"></div>
 
-                <div class="grid grid-cols-2 gap-2">
-                    <button type="button" onclick="crearTarjetaEnPantalla(false, null)" class="border border-indigo-500 text-indigo-600 bg-white text-xs font-semibold p-3 rounded-xl flex items-center justify-center gap-1">
-                        <span>➕ Acompañante Base</span>
-                    </button>
-                    <button type="button" onclick="crearTarjetaEnPantalla(true, null)" class="border border-amber-500 text-amber-700 bg-amber-50 text-xs font-semibold p-3 rounded-xl flex items-center justify-center gap-1">
-                        <span>➕ Caso Excepcional</span>
+                <!-- BOTONERA: Se ha eliminado por completo el botón de Acompañante Base -->
+                <div class="flex justify-center">
+                    <button type="button" onclick="crearTarjetaEnPantalla(true, null)" class="w-full border-2 border-dashed border-amber-400 text-amber-800 bg-amber-50 font-bold p-3 rounded-xl flex items-center justify-center gap-2 hover:bg-amber-100 transition-colors text-sm shadow-sm">
+                        <span>➕ Solicitar Caso Excepcional</span>
                     </button>
                 </div>
 
@@ -101,7 +99,6 @@
         let usuarioDni = "";
         let maxAcompanantesHistoricos = 0;
 
-        // VALIDADOR ESTRICTO DE DNI/NIE (Devuelve true si es matemáticamente correcto)
         function validarDniNie(documento) {
             const regex = /^[XYZ\d]\d{7}[A-Z]$/i;
             if (!regex.test(documento)) return false;
@@ -128,7 +125,6 @@
                 return;
             }
 
-            // CORRECCIÓN 1: Si el formato o cálculo está mal, da "Incorrecto" y frena en seco
             if (!validarDniNie(inputDni)) {
                 Swal.fire({
                     title: 'DNI/NIE Incorrecto',
@@ -190,6 +186,7 @@
                     crearTarjetaEnPantalla(inv.es_excepcion, inv, inv.numero_acompanante);
                 });
             } else {
+                // Al entrar de cero, forzamos siempre la aparición de los 2 pases base reglamentarios
                 crearTarjetaEnPantalla(false, null, 1);
                 crearTarjetaEnPantalla(false, null, 2);
                 maxAcompanantesHistoricos = 2;
@@ -209,15 +206,17 @@
             card.dataset.esExcepcion = esExcepcion;
             card.dataset.numeroAcompanante = numeroFijo;
 
-            // CORRECCIÓN 2: Eliminado el texto "(Opcional)" del marcador de posición del DNI
+            // En las tarjetas base (no excepciones) quitamos el botón visual de eliminar para mantener las 2 plazas asignadas en pantalla
+            const botonEliminar = esExcepcion 
+                ? `<button type="button" onclick="marcarComoEliminado(this)" class="text-red-500 font-bold text-xs bg-red-50 px-2 py-1 rounded-lg border border-red-200">Eliminar</button>`
+                : '';
+
             card.innerHTML = `
                 <div class="flex justify-between items-center border-b pb-2 mb-2 ${esExcepcion ? 'border-amber-200' : 'border-gray-200'}">
                     <span class="text-xs uppercase font-extrabold tracking-wider ${esExcepcion ? 'text-amber-700' : 'text-gray-500'}">
-                        ${esExcepcion ? '⚠️ Caso Excepcional' : `Acompañante Base`}
+                        ${esExcepcion ? '⚠️ Caso Excepcional' : `Acompañante Asignado (Base)`}
                     </span>
-                    <button type="button" onclick="marcarComoEliminado(this)" class="text-red-500 font-bold text-xs bg-red-50 px-2 py-1 rounded-lg border border-red-200">
-                        Eliminar
-                    </button>
+                    ${botonEliminar}
                 </div>
                 <div class="grid grid-cols-1 gap-2">
                     <input type="text" placeholder="Nombre completo" class="inv-nombre w-full p-3 text-sm border rounded-lg focus:outline-none" value="${datos ? datos.nombre : ''}">
@@ -255,7 +254,7 @@
             const tarjetas = document.getElementsByClassName('tarjeta-dinamica');
             const listaParaUpsert = [];
 
-            let indexVisual = 0; // Para indicar con precisión el número de acompañante erróneo
+            let indexVisual = 0;
 
             for (let card of tarjetas) {
                 const numPosicion = parseInt(card.dataset.numeroAcompanante);
@@ -283,14 +282,12 @@
                 const parentesco = card.querySelector('.inv-parentesco').value;
                 const motivo = esExcepcion ? card.querySelector('.inv-motivo').value.trim() : null;
 
-                // Si se ha empezado a rellenar la tarjeta
                 if (nombre || apellidos || dni || parentesco) {
                     if (!nombre || !apellidos) {
                         Swal.fire('Atención', `Por favor, completa el nombre y apellidos del acompañante Nº ${indexVisual}.`, 'warning');
                         return;
                     }
                     
-                    // CORRECCIÓN 3: DNI Obligatorio y con validación matemática estricta antes de guardar
                     if (!dni) {
                         Swal.fire('DNI Obligatorio', `El DNI del acompañante Nº ${indexVisual} (${nombre}) es obligatorio.`, 'warning');
                         return;
@@ -303,7 +300,7 @@
                             icon: 'error',
                             confirmButtonColor: '#ef4444'
                         });
-                        return; // Detiene el envío por completo
+                        return;
                     }
 
                     if (!parentesco) {
