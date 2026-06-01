@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Registro de Invitados - EVENTO 07</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 font-sans min-h-screen flex flex-col justify-between">
+
+    <div class="max-w-md w-full mx-auto bg-white min-h-screen shadow-md flex flex-col justify-between">
+        
+        <header class="bg-indigo-700 text-white p-6 text-center shadow-lg">
+            <h1 class="text-2xl font-bold tracking-wide">EVENTO 07</h1>
+            <p class="text-indigo-200 text-sm mt-1">Confirmación y Gestión de Invitados</p>
+        </header>
+
+        <div id="pantalla-login" class="p-6 flex-grow flex flex-col justify-center items-center">
+            <div class="w-full space-y-4">
+                <div class="text-center mb-6">
+                    <p class="text-gray-600 font-medium">Introduce tu DNI/NIE para acceder a tus invitaciones</p>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Tu Documento de Identidad</label>
+                    <input type="text" id="login-dni" placeholder="Ej: 12345678Z" class="w-full p-4 border-2 border-gray-300 rounded-xl text-lg font-semibold uppercase focus:border-indigo-500 focus:outline-none">
+                </div>
+                <button onclick="verificarAcceso()" class="w-full bg-indigo-600 text-white font-bold p-4 rounded-xl shadow-md text-lg">
+                    Acceder al Formulario
+                </button>
+            </div>
+        </div>
+
+        <div id="pantalla-formulario" class="p-6 flex-grow hidden space-y-6">
+            <div class="bg-indigo-50 p-4 rounded-xl border border-indigo-100">
+                <span class="text-xs uppercase font-bold text-indigo-500 tracking-wider">Titular Autorizado</span>
+                <h2 id="nombre-titular" class="text-xl font-bold text-gray-800">Cargando...</h2>
+                <p class="text-xs text-gray-500 mt-1">Gestiona tus acompañantes libres. Puedes añadir o eliminar tarjetas según necesites.</p>
+            </div>
+
+            <form id="form-invitados" onsubmit="guardarDatos(event)" class="space-y-6">
+                <div id="lista-invitados" class="space-y-4"></div>
+
+                <div class="grid grid-cols-2 gap-2">
+                    <button type="button" onclick="crearTarjetaEnPantalla(false, null)" class="border border-indigo-500 text-indigo-600 bg-white text-xs font-semibold p-3 rounded-xl flex items-center justify-center gap-1">
+                        <span>➕ Acompañante Base</span>
+                    </button>
+                    <button type="button" onclick="crearTarjetaEnPantalla(true, null)" class="border border-amber-500 text-amber-700 bg-amber-50 text-xs font-semibold p-3 rounded-xl flex items-center justify-center gap-1">
+                        <span>➕ Caso Excepcional</span>
+                    </button>
+                </div>
+
+                <div class="bg-blue-50 p-4 rounded-xl border border-blue-200 mt-4">
+                    <div class="flex items-start">
+                        <div class="flex items-center h-5">
+                            <input id="check-discapacidad" type="checkbox" class="w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500 cursor-pointer">
+                        </div>
+                        <div class="ml-3 text-xs">
+                            <label for="check-discapacidad" class="font-bold text-blue-950 cursor-pointer select-none">
+                                ¿Algún miembro del grupo requiere acceso a la zona habilitada para personal con discapacidad/movilidad reducida?
+                            </label>
+                            <p class="text-blue-700 text-[11px] mt-0.5">Nota: Si se marca "Sí", se asignará pase a esta zona reservada para todo el grupo familiar.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-gray-50 p-4 rounded-xl border border-gray-200">
+                    <div class="flex items-start">
+                        <div class="flex items-center h-5">
+                            <input id="check-lopd" type="checkbox" class="w-5 h-5 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500 cursor-pointer">
+                        </div>
+                        <div class="ml-3 text-xs">
+                            <label for="check-lopd" class="font-medium text-gray-700 cursor-pointer select-none">
+                                Acepto el tratamiento de los datos facilitados exclusivamente para la gestión de confirmaciones, control de accesos y organización del EVENTO 07 de conformidad con la LOPDGDD y el RGPD.
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <button type="submit" class="w-full bg-green-600 text-white font-bold p-4 rounded-xl shadow-lg text-lg">
+                    Guardar y Confirmar Lista
+                </button>
+            </form>
+        </div>
+
+        <footer class="p-4 bg-gray-50 text-center border-t border-gray-200">
+            <p class="text-xs text-gray-400 font-medium">© 2026 Organización EVENTO 07</p>
+        </footer>
+    </div>
+
+    <script>
+        const SUPABASE_URL = "https://nebtkwgebbgenmlysnui.supabase.co";
+        const SUPABASE_KEY = "sb_publishable_zCd7omi4D9AK2rAXlTEvmw_UwKYo0d_";
+        const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+        let usuarioDni = "";
+        let maxAcompanantesHistoricos = 0;
+
+        async function verificarAcceso() {
+            const inputDni = document.getElementById('login-dni').value.trim().toUpperCase();
+            if(!inputDni) {
+                Swal.fire('Atención', 'Por favor, escribe tu DNI.', 'warning');
+                return;
+            }
+
+            Swal.fire({ title: 'Buscando tu registro...', didOpen: () => Swal.showLoading(), allowOutsideClick: false });
+
+            try {
+                const { data: titular, error } = await _supabase
+                    .from('titulares')
+                    .select('*')
+                    .eq('dni', inputDni)
+                    .maybeSingle();
+
+                if (error || !titular) {
+                    Swal.fire('No encontrado', 'El DNI introducido no consta en la lista de autorizados.', 'error');
+                    return;
+                }
+
+                usuarioDni = inputDni;
+                document.getElementById('nombre-titular').innerText = `${titular.nombre} ${titular.apellido1} ${titular.apellido2 || ''}`;
+                
+                await cargarInvitadosExistentes();
+
+                document.getElementById('pantalla-login').classList.add('hidden');
+                document.getElementById('pantalla-formulario').classList.remove('hidden');
+                Swal.close();
+
+            } catch (err) {
+                Swal.fire('Error', 'Hubo un problema al conectar con el servidor.', 'error');
+            }
+        }
+
+        async function cargarInvitadosExistentes() {
+            const container = document.getElementById('lista-invitados');
+            container.innerHTML = "";
+
+            const { data: existentes } = await _supabase
+                .from('invitados')
+                .select('*')
+                .eq('titular_dni', usuarioDni)
+                .order('numero_acompanante', { ascending: true });
+
+            maxAcompanantesHistoricos = existentes ? existentes.length : 0;
+            const activos = existentes ? existentes.filter(inv => inv.nombre && inv.nombre.trim() !== "") : [];
+
+            // Si ya tenían datos guardados, comprobamos si alguno tenía marcada la casilla de zona habilitada
+            if (existentes && existentes.length > 0) {
+                const algunDiscapacitado = existentes.some(inv => inv.zona_discapacidad === true);
+                document.getElementById('check-discapacidad').checked = algunDiscapacitado;
+            }
+
+            if (activos.length > 0) {
+                activos.forEach(inv => {
+                    crearTarjetaEnPantalla(inv.es_excepcion, inv, inv.numero_acompanante);
+                });
+            } else {
+                crearTarjetaEnPantalla(false, null, 1);
+                crearTarjetaEnPantalla(false, null, 2);
+                maxAcompanantesHistoricos = 2;
+            }
+        }
+
+        function crearTarjetaEnPantalla(esExcepcion, datos = null, numeroFijo = null) {
+            const container = document.getElementById('lista-invitados');
+            
+            if (!numeroFijo) {
+                maxAcompanantesHistoricos++;
+                numeroFijo = maxAcompanantesHistoricos;
+            }
+
+            const card = document.createElement('div');
+            card.className = `p-4 rounded-xl border-2 shadow-sm relative space-y-3 tarjeta-dinamica ${esExcepcion ? 'border-amber-300 bg-amber-50/50' : 'border-gray-200 bg-gray-50/50'}`;
+            card.dataset.esExcepcion = esExcepcion;
+            card.dataset.numeroAcompanante = numeroFijo;
+
+            card.innerHTML = `
+                <div class="flex justify-between items-center border-b pb-2 mb-2 ${esExcepcion ? 'border-amber-200' : 'border-gray-200'}">
+                    <span class="text-xs uppercase font-extrabold tracking-wider ${esExcepcion ? 'text-amber-700' : 'text-gray-500'}">
+                        ${esExcepcion ? '⚠️ Caso Excepcional' : `Acompañante Base`}
+                    </span>
+                    <button type="button" onclick="marcarComoEliminado(this)" class="text-red-500 font-bold text-xs bg-red-50 px-2 py-1 rounded-lg border border-red-200">
+                        Eliminar
+                    </button>
+                </div>
+                <div class="grid grid-cols-1 gap-2">
+                    <input type="text" placeholder="Nombre completo" class="inv-nombre w-full p-3 text-sm border rounded-lg focus:outline-none" value="${datos ? datos.nombre : ''}">
+                    <input type="text" placeholder="Apellidos" class="inv-apellidos w-full p-3 text-sm border rounded-lg focus:outline-none" value="${datos ? datos.apellidos : ''}">
+                    <input type="text" placeholder="DNI / Documento (Opcional)" class="inv-dni w-full p-3 text-sm border rounded-lg uppercase focus:outline-none" value="${datos ? (datos.dni || '') : ''}">
+                    <select class="inv-parentesco w-full p-3 text-sm border rounded-lg bg-white focus:outline-none">
+                        <option value="" disabled ${!datos ? 'selected' : ''}>Selecciona parentesco</option>
+                        <option value="Pareja" ${datos && datos.parentesco === 'Pareja' ? 'selected' : ''}>Pareja</option>
+                        <option value="Hijo/a" ${datos && datos.parentesco === 'Hijo/a' ? 'selected' : ''}>Hijo/a</option>
+                        <option value="Padre/Madre" ${datos && datos.parentesco === 'Padre/Madre' ? 'selected' : ''}>Padre/Madre</option>
+                        <option value="Hermano/a" ${datos && datos.parentesco === 'Hermano/a' ? 'selected' : ''}>Hermano/a</option>
+                        <option value="Otros" ${datos && datos.parentesco === 'Otros' ? 'selected' : ''}>Otro</option>
+                    </select>
+                </div>
+                ${esExcepcion ? `<div class="mt-2"><textarea placeholder="Justificación breve..." class="inv-motivo w-full p-3 text-xs border border-amber-300 rounded-lg focus:outline-none" rows="2">${datos ? (datos.motivo_excepcion || '') : ''}</textarea></div>` : ''}
+            `;
+            container.appendChild(card);
+        }
+
+        function marcarComoEliminado(btn) {
+            const card = btn.closest('.tarjeta-dinamica');
+            card.classList.add('hidden', 'para-borrar');
+        }
+
+        async function guardarDatos(event) {
+            event.preventDefault();
+
+            const checkLopd = document.getElementById('check-lopd');
+            if (!checkLopd.checked) {
+                Swal.fire('Requisito Legal', 'Para enviar el formulario debes aceptar la cláusula de protección de datos.', 'warning');
+                return;
+            }
+
+            // LEEMOS EL ESTADO DE LA CASILLA DE ACCESO ADAPTADO
+            const requiereZonaAdaptada = document.getElementById('check-discapacidad').checked;
+
+            Swal.fire({ title: 'Guardando cambios...', didOpen: () => Swal.showLoading(), allowOutsideClick: false });
+
+            const tarjetas = document.getElementsByClassName('tarjeta-dinamica');
+            const listaParaUpsert = [];
+
+            for (let card of tarjetas) {
+                const numPosicion = parseInt(card.dataset.numeroAcompanante);
+                const esExcepcion = card.dataset.esExcepcion === "true";
+
+                if (card.classList.contains('para-borrar')) {
+                    listaParaUpsert.push({
+                        titular_dni: usuarioDni,
+                        numero_acompanante: numPosicion,
+                        nombre: "",
+                        apellidos: "",
+                        dni: null,
+                        parentesco: "Otros",
+                        es_excepcion: esExcepcion,
+                        motivo_excepcion: null,
+                        zona_discapacidad: false // Si se borra la tarjeta, se limpia el valor
+                    });
+                    continue;
+                }
+
+                const nombre = card.querySelector('.inv-nombre').value.trim();
+                const apellidos = card.querySelector('.inv-apellidos').value.trim();
+                const dni = card.querySelector('.inv-dni').value.trim().toUpperCase();
+                const parentesco = card.querySelector('.inv-parentesco').value;
+                const motivo = esExcepcion ? card.querySelector('.inv-motivo').value.trim() : null;
+
+                if (nombre && apellidos) {
+                    if (!parentesco) {
+                        Swal.fire('Atención', `Por favor, selecciona el parentesco para ${nombre}.`, 'warning');
+                        return;
+                    }
+                    if (esExcepcion && !motivo) {
+                        Swal.fire('Atención', `Por favor, justifica el caso excepcional de ${nombre}.`, 'warning');
+                        return;
+                    }
+
+                    listaParaUpsert.push({
+                        titular_dni: usuarioDni,
+                        numero_acompanante: numPosicion,
+                        nombre: nombre,
+                        apellidos: apellidos,
+                        dni: dni || null,
+                        parentesco: parentesco,
+                        es_excepcion: esExcepcion,
+                        motivo_excepcion: motivo,
+                        // REGLA CLAVE: Se le asigna el valor general del interruptor a todos los miembros activos
+                        zona_discapacidad: requiereZonaAdaptada 
+                    });
+                }
+            }
+
+            try {
+                if (listaParaUpsert.length > 0) {
+                    const { error } = await _supabase
+                        .from('invitados')
+                        .upsert(listaParaUpsert, { onConflict: 'titular_dni,numero_acompanante' });
+
+                    if (error) throw error;
+                }
+
+                Swal.fire({
+                    title: '¡Todo guardado!',
+                    text: 'Los acompañantes se han actualizado perfectamente.',
+                    icon: 'success',
+                    confirmButtonColor: '#4f46e5'
+                }).then(() => location.reload());
+
+            } catch (e) {
+                Swal.fire('Error', 'No se pudieron sincronizar los datos con el servidor.', 'error');
+            }
+        }
+    </script>
+</body>
+</html>
