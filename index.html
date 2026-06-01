@@ -101,13 +101,12 @@
         let usuarioDni = "";
         let maxAcompanantesHistoricos = 0;
 
-        // FUNCIÓN MATEMÁTICA PARA VALIDAR EL FORMATO Y LA LETRA DEL DNI/NIE
+        // VALIDADOR ESTRICTO DE DNI/NIE (Devuelve true si es matemáticamente correcto)
         function validarDniNie(documento) {
             const regex = /^[XYZ\d]\d{7}[A-Z]$/i;
             if (!regex.test(documento)) return false;
 
             let stringDni = documento.toUpperCase();
-            // Adaptación para NIEs (X=0, Y=1, Z=2)
             stringDni = stringDni
                 .replace(/^X/, '0')
                 .replace(/^Y/, '1')
@@ -129,15 +128,15 @@
                 return;
             }
 
-            // COMPROBACIÓN ANTES DE IR A LA BASE DE DATOS
+            // CORRECCIÓN 1: Si el formato o cálculo está mal, da "Incorrecto" y frena en seco
             if (!validarDniNie(inputDni)) {
                 Swal.fire({
-                    title: 'Formato incorrecto',
-                    text: 'El número o la letra del documento no son válidos. Por favor, compruébalo.',
+                    title: 'DNI/NIE Incorrecto',
+                    text: 'El formato o la letra del documento introducido no son válidos. Por favor, revísalo.',
                     icon: 'error',
                     confirmButtonColor: '#ef4444'
                 });
-                return;
+                return; 
             }
 
             Swal.fire({ title: 'Buscando tu registro...', didOpen: () => Swal.showLoading(), allowOutsideClick: false });
@@ -150,7 +149,7 @@
                     .maybeSingle();
 
                 if (error || !titular) {
-                    Swal.fire('No encontrado', 'El DNI introducido es válido pero no consta en la lista de autorizados.', 'error');
+                    Swal.fire('No encontrado', 'El DNI introducido es correcto, pero no consta en la lista de autorizados del evento.', 'error');
                     return;
                 }
 
@@ -210,6 +209,7 @@
             card.dataset.esExcepcion = esExcepcion;
             card.dataset.numeroAcompanante = numeroFijo;
 
+            // CORRECCIÓN 2: Eliminado el texto "(Opcional)" del marcador de posición del DNI
             card.innerHTML = `
                 <div class="flex justify-between items-center border-b pb-2 mb-2 ${esExcepcion ? 'border-amber-200' : 'border-gray-200'}">
                     <span class="text-xs uppercase font-extrabold tracking-wider ${esExcepcion ? 'text-amber-700' : 'text-gray-500'}">
@@ -222,7 +222,7 @@
                 <div class="grid grid-cols-1 gap-2">
                     <input type="text" placeholder="Nombre completo" class="inv-nombre w-full p-3 text-sm border rounded-lg focus:outline-none" value="${datos ? datos.nombre : ''}">
                     <input type="text" placeholder="Apellidos" class="inv-apellidos w-full p-3 text-sm border rounded-lg focus:outline-none" value="${datos ? datos.apellidos : ''}">
-                    <input type="text" placeholder="DNI / Documento (Opcional)" class="inv-dni w-full p-3 text-sm border rounded-lg uppercase focus:outline-none" value="${datos ? (datos.dni || '') : ''}">
+                    <input type="text" placeholder="DNI / NIE del acompañante" class="inv-dni w-full p-3 text-sm border rounded-lg uppercase focus:outline-none" value="${datos ? (datos.dni || '') : ''}">
                     <select class="inv-parentesco w-full p-3 text-sm border rounded-lg bg-white focus:outline-none">
                         <option value="" disabled ${!datos ? 'selected' : ''}>Selecciona parentesco</option>
                         <option value="Pareja" ${datos && datos.parentesco === 'Pareja' ? 'selected' : ''}>Pareja</option>
@@ -252,10 +252,10 @@
             }
 
             const requiereZonaAdaptada = document.getElementById('check-discapacidad').checked;
-            Swal.fire({ title: 'Guardando cambios...', didOpen: () => Swal.showLoading(), allowOutsideClick: false });
-
             const tarjetas = document.getElementsByClassName('tarjeta-dinamica');
             const listaParaUpsert = [];
+
+            let indexVisual = 0; // Para indicar con precisión el número de acompañante erróneo
 
             for (let card of tarjetas) {
                 const numPosicion = parseInt(card.dataset.numeroAcompanante);
@@ -276,13 +276,36 @@
                     continue;
                 }
 
+                indexVisual++;
                 const nombre = card.querySelector('.inv-nombre').value.trim();
                 const apellidos = card.querySelector('.inv-apellidos').value.trim();
                 const dni = card.querySelector('.inv-dni').value.trim().toUpperCase();
                 const parentesco = card.querySelector('.inv-parentesco').value;
                 const motivo = esExcepcion ? card.querySelector('.inv-motivo').value.trim() : null;
 
-                if (nombre && apellidos) {
+                // Si se ha empezado a rellenar la tarjeta
+                if (nombre || apellidos || dni || parentesco) {
+                    if (!nombre || !apellidos) {
+                        Swal.fire('Atención', `Por favor, completa el nombre y apellidos del acompañante Nº ${indexVisual}.`, 'warning');
+                        return;
+                    }
+                    
+                    // CORRECCIÓN 3: DNI Obligatorio y con validación matemática estricta antes de guardar
+                    if (!dni) {
+                        Swal.fire('DNI Obligatorio', `El DNI del acompañante Nº ${indexVisual} (${nombre}) es obligatorio.`, 'warning');
+                        return;
+                    }
+                    
+                    if (!validarDniNie(dni)) {
+                        Swal.fire({
+                            title: 'DNI de Acompañante Incorrecto',
+                            text: `La letra o formato del DNI introducido para el acompañante Nº ${indexVisual} (${nombre}) no es válido. Por favor, corrígelo.`,
+                            icon: 'error',
+                            confirmButtonColor: '#ef4444'
+                        });
+                        return; // Detiene el envío por completo
+                    }
+
                     if (!parentesco) {
                         Swal.fire('Atención', `Por favor, selecciona el parentesco para ${nombre}.`, 'warning');
                         return;
@@ -292,18 +315,12 @@
                         return;
                     }
 
-                    // ADVERTENCIA OPCIONAL PARA EL DNI DEL ACOMPAÑANTE
-                    if (dni && !validarDniNie(dni)) {
-                        Swal.fire('DNI de Acompañante no válido', `La letra del DNI introducido para el acompañante ${nombre} no es correcta. Por favor, revísala antes de continuar.`, 'warning');
-                        return;
-                    }
-
                     listaParaUpsert.push({
                         titular_dni: usuarioDni,
                         numero_acompanante: numPosicion,
                         nombre: nombre,
                         apellidos: apellidos,
-                        dni: dni || null,
+                        dni: dni,
                         parentesco: parentesco,
                         es_excepcion: esExcepcion,
                         motivo_excepcion: motivo,
@@ -311,6 +328,8 @@
                     });
                 }
             }
+
+            Swal.fire({ title: 'Guardando cambios...', didOpen: () => Swal.showLoading(), allowOutsideClick: false });
 
             try {
                 if (listaParaUpsert.length > 0) {
