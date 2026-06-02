@@ -17,7 +17,6 @@
             <p class="text-indigo-200 text-sm mt-1">Confirmación y Gestión de Invitados</p>
         </header>
 
-        <!-- PANTALLA 1: LOGIN -->
         <div id="pantalla-login" class="p-6 flex-grow flex flex-col justify-center items-center">
             <div class="w-full space-y-4">
                 <div class="text-center mb-6">
@@ -33,7 +32,6 @@
             </div>
         </div>
 
-        <!-- PANTALLA 2: FORMULARIO -->
         <div id="pantalla-formulario" class="p-6 flex-grow hidden space-y-6">
             <div class="bg-indigo-50 p-4 rounded-xl border border-indigo-100">
                 <span class="text-xs uppercase font-bold text-indigo-500 tracking-wider">Titular Autorizado</span>
@@ -46,14 +44,12 @@
             <form id="form-invitados" onsubmit="guardarDatos(event)" class="space-y-6">
                 <div id="lista-invitados" class="space-y-4"></div>
 
-                <!-- BOTONERA ÚNICA -->
                 <div class="flex justify-center">
                     <button type="button" onclick="crearTarjetaEnPantalla(true, null)" class="w-full border-2 border-dashed border-amber-400 text-amber-800 bg-amber-50 font-bold p-3 rounded-xl flex items-center justify-center gap-2 hover:bg-amber-100 transition-colors text-sm shadow-sm">
                         <span>➕ Solicitar Caso Excepcional</span>
                     </button>
                 </div>
 
-                <!-- CASILLA: ZONA HABILITADA DISCAPACIDAD -->
                 <div class="bg-blue-50 p-4 rounded-xl border border-blue-200 mt-4">
                     <div class="flex items-start">
                         <div class="flex items-center h-5">
@@ -68,7 +64,6 @@
                     </div>
                 </div>
 
-                <!-- CASILLA LEGAL LOPD -->
                 <div class="bg-gray-50 p-4 rounded-xl border border-gray-200">
                     <div class="flex items-start">
                         <div class="flex items-center h-5">
@@ -101,7 +96,6 @@
         let usuarioDni = "";
         let maxAcompanantesHistoricos = 0;
 
-        // ESTRUCTURA DE CAPACIDADES MÁXIMAS DE LAS GRADAS
         const CAPACIDADES_GRADAS = {
             'A': 72, 'B': 72, 'C': 72, 'D': 72, 'E': 228, 'F': 228, 'G': 104, 'H': 72, 'I': 112
         };
@@ -205,8 +199,9 @@
                     crearTarjetaEnPantalla(inv.es_excepcion, inv, inv.numero_acompanante);
                 });
             } else {
+                // CORREGIDO: Eliminado el error tipográfico "Pantaclea"
                 crearTarjetaEnPantalla(false, null, 1);
-                crearTarjetaEnPantaclea(false, null, 2);
+                crearTarjetaEnPantalla(false, null, 2);
                 crearTarjetaEnPantalla(false, null, 3);
                 maxAcompanantesHistoricos = 3;
             }
@@ -232,7 +227,6 @@
 
             const yaCedida = datos && datos.cedido_por_dni && datos.cedido_por_dni !== "";
             
-            // Si el invitado ya tiene un asiento asignado por el algoritmo, se lo recordamos visualmente en pequeño
             const badgeAsiento = datos && datos.asignacion_grada 
                 ? `<span class="text-[11px] bg-indigo-100 text-indigo-700 font-bold px-2 py-0.5 rounded-md">Asiento: ${datos.asignacion_grada}-${datos.asignacion_asiento}</span>`
                 : '';
@@ -318,12 +312,10 @@
             });
         }
 
-        // ALGORITMO INTEGRADO DE ASIGNACIÓN MATEMÁTICA DE ASIENTOS COMPACTOS
         function calcularAsignacionAsientos(listaAcompanantesValidos, todosLosInvitadosOcupados, requiereZonaAdaptada) {
             const tamanoFamilia = listaAcompanantesValidos.length;
             if (tamanoFamilia === 0) return;
 
-            // Escenario A: Han marcado movilidad reducida o discapacidad -> Van directos al acotado familiar
             if (requiereZonaAdaptada) {
                 listaAcompanantesValidos.forEach(inv => {
                     inv.asignacion_grada = "ACOTADO";
@@ -332,7 +324,6 @@
                 return;
             }
 
-            // Escenario B: Van a gradas estándar. Inicializamos el mapa de ocupación actual de todo el evento
             const mapaOcupacion = { 'A': [], 'B': [], 'C': [], 'D': [], 'E': [], 'F': [], 'G': [], 'H': [], 'I': [] };
             
             todosLosInvitadosOcupados.forEach(inv => {
@@ -341,7 +332,6 @@
                 }
             });
 
-            // Buscamos la primera grada alfabética que tenga espacio suficiente continuo para alojar a toda la familia junta
             let gradaSeleccionada = null;
             let asientoInicial = 1;
 
@@ -350,7 +340,6 @@
                 const capMax = CAPACIDADES_GRADAS[g];
                 const asientosOcupados = mapaOcupacion[g];
                 
-                // Buscamos un hueco consecutivo de tamaño "tamanoFamilia"
                 let contadorConsecutivos = 0;
                 let posibleAsientoInicio = 1;
 
@@ -364,26 +353,24 @@
                             break;
                         }
                     } else {
-                        contadorConsecutivos = 0; // Se rompe la racha si el asiento está ocupado
+                        contadorConsecutivos = 0;
                     }
                 }
-                if (gradaSeleccionada) break; // Si ya encontramos grada, paramos de buscar
+                if (gradaSeleccionada) break;
             }
 
-            // Si por un aforo crítico no cupieran juntos en ninguna grada, los metemos en la primera que tenga asientos sueltos
             if (!gradaSeleccionada) {
                 for (let g of letrasGradas) {
                     const capMax = CAPACIDADES_GRADAS[g];
                     const asientosOcupados = mapaOcupacion[g];
-                    const libres en la grada = capMax - asientosOcupados.length;
+                    const libres = capMax - asientosOcupados.length;
                     if (libres >= tamanoFamilia) {
                         gradaSeleccionada = g;
-                        // Buscamos los asientos libres que haya (aunque no sean totalmente consecutivos)
                         let asignados = 0;
                         for (let a = 1; a <= capMax && asignados < tamanoFamilia; a++) {
                             if (!asientosOcupados.includes(a)) {
-                                listaAcompanantesValidos[asignados].asignacion_grada = g;
-                                listaAcompanantesValidos[asignados].asignacion_asiento = a;
+                                listaAcompanantesValidos[assigned].asignacion_grada = g;
+                                listaAcompanantesValidos[assigned].asignacion_asiento = a;
                                 asignados++;
                             }
                         }
@@ -392,7 +379,6 @@
                 }
             }
 
-            // Flujo ideal: Asignación correlativa compacta en la grada elegida
             if (gradaSeleccionada) {
                 let asientoSiguiente = asientoInicial;
                 listaAcompanantesValidos.forEach(inv => {
@@ -401,7 +387,6 @@
                     asientoSiguiente++;
                 });
             } else {
-                // Alerta de seguridad si el recinto se llenase al 100% por completo
                 listaAcompanantesValidos.forEach(inv => {
                     inv.asignacion_grada = "REBOSAMIENTO";
                     inv.asignacion_asiento = 0;
@@ -503,7 +488,6 @@
                             return;
                         }
 
-                        // Creamos el objeto base del invitado familiar
                         const objetoInvitado = {
                             titular_dni: usuarioDni, numero_acompanante: numPosicion, nombre: nombre,
                             apellidos: apellidos, dni: dni, parentesco: parentesco, es_excepcion: esExcepcion,
@@ -513,7 +497,7 @@
                         };
 
                         listaParaUpsert.push(objetoInvitado);
-                        listaParaAsignarAsientoLocal.push(objetoInvitado); // Lista limpia que pasará por el algoritmo matemático
+                        listaParaAsignarAsientoLocal.push(objetoInvitado);
                     }
                 }
             }
@@ -521,12 +505,10 @@
             Swal.fire({ title: 'Calculando optimización de gradas...', didOpen: () => Swal.showLoading(), allowOutsideClick: false });
 
             try {
-                // Descargamos la ocupación total actual del recinto en tiempo real para evitar colisiones entre usuarios concurrentes
                 const { data: todosLosInvitadosRegistrados } = await _supabase
                     .from('invitados')
                     .select('titular_dni, asignacion_grada, asignacion_asiento');
 
-                // LALZAMOS EL ALGORITMO INTELIGENTE DE ASIENTOS CON NUESTRA FAMILIA ACTUAL
                 calcularAsignacionAsientos(listaParaAsignarAsientoLocal, todosLosInvitadosRegistrados || [], requiereZonaAdaptada);
 
                 if (listaParaUpsert.length > 0) {
