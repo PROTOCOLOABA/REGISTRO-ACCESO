@@ -141,14 +141,15 @@
             const container = document.getElementById('lista-invitados');
             container.innerHTML = "";
 
+            // Descargamos todo lo asociado a este DNI
             const { data: registrados, error } = await _supabase.from('invitados')
                 .select('*')
                 .eq('titular_dni', usuarioDni)
-                .order('numero_acompanante', { ascending: true });
+                .order('id', { ascending: true });
 
             const listado = registrados || [];
 
-            // Clasificación limpia de pases en posesión de este DNI
+            // Clasificación limpia
             const pasesBasePropios = listado.filter(inv => inv.numero_acompanante <= 3 && !inv.cedido_por_dni);
             const pasesCedidosRecibidos = listado.filter(inv => inv.cedido_por_dni);
             const excepciones = listado.filter(inv => inv.numero_acompanante > 3 && !inv.cedido_por_dni);
@@ -156,35 +157,44 @@
             const algunFamiliarDiscapacitado = listado.some(inv => inv.zona_discapacidad === true);
             document.getElementById('check-discapacidad').checked = algunFamiliarDiscapacitado;
 
-            // 1. Renderizar tres ranuras base obligatorias (1 a 3)
+            // 1. Forzar las 3 ranuras reglamentarias de mi cuenta familiar
             for (let r = 1; r <= 3; r++) {
                 const registro = pasesBasePropios.find(m => m.numero_acompanante === r);
                 crearTarjetaEnPantalla(false, registro, r, "");
             }
 
-            // 2. Renderizar pases recibidos cedidos por otros
+            // 2. Pintar pases extras que me han regalado a mí
             pasesCedidosRecibidos.forEach((inv, i) => {
-                crearTarjetaEnPantalla(false, inv, 200 + i, inv.cedido_por_dni);
+                crearTarjetaEnPantalla(false, inv, null, inv.cedido_por_dni);
             });
 
-            // 3. Renderizar Excepciones extraordinarias
+            // 3. Pintar Excepciones extraordinarias
             excepciones.forEach(inv => {
                 crearTarjetaEnPantalla(true, inv, inv.numero_acompanante, "");
             });
 
-            const maxNum = listado.reduce((max, inv) => inv.numero_acompanante > max ? inv.numero_acompanante : max, 3);
-            maxAcompanantesHistoricos = maxNum > 100 ? 3 : maxNum;
+            // Fijamos contadores seguros
+            const soloNormales = listado.filter(inv => inv.numero_acompanante <= 100);
+            const maxNum = soloNormales.reduce((max, inv) => inv.numero_acompanante > max ? inv.numero_acompanante : max, 3);
+            maxAcompanantesHistoricos = maxNum;
+
             reordenarTitulosVisuales();
         }
 
         function crearTarjetaEnPantalla(esExcepcion, datos = null, numeroFijo = null, emisorDni = "") {
             const container = document.getElementById('lista-invitados');
-            if (!numeroFijo) { maxAcompanantesHistoricos++; numeroFijo = maxAcompanantesHistoricos; }
+            
+            // Si no viene prefijado, incrementamos contador secuencial para pases nuevos o excepciones
+            let posicionDataset = numeroFijo;
+            if (!posicionDataset) {
+                maxAcompanantesHistoricos++;
+                posicionDataset = maxAcompanantesHistoricos;
+            }
 
             const card = document.createElement('div');
             card.className = `p-4 rounded-xl border-2 shadow-sm relative space-y-3 tarjeta-dinamica ${esExcepcion ? 'border-amber-300 bg-amber-50/50' : 'border-gray-200 bg-gray-50/50'}`;
             card.dataset.esExcepcion = esExcepcion;
-            card.dataset.numeroAcompanante = numeroFijo;
+            card.dataset.numeroAcompanante = posicionDataset;
             
             if (datos && datos.id) card.dataset.idFilaDb = datos.id;
             
@@ -219,6 +229,8 @@
             let a = datos && datos.apellidos ? datos.apellidos : "";
             let d = datos && datos.dni ? datos.dni : "";
             let f = datos && datos.fecha_nacimiento ? datos.fecha_nacimiento : "";
+
+            if (n === "Pase Cedido") n = "";
 
             const ocultarPorCesionAnterior = datos && datos.cedido_por_dni_destino;
 
@@ -290,7 +302,6 @@
                 const idFilaDb = card.dataset.idFilaDb ? parseInt(card.dataset.idFilaDb) : null;
                 const emisorOriginalDni = card.dataset.cedidoPorDni || null;
 
-                // Lógica de borrado físico/limpieza
                 if (card.classList.contains('para-borrar')) {
                     if (idFilaDb) {
                         pasesParaUpsert.push({
@@ -317,16 +328,16 @@
                         Swal.fire('Atención', `DNI de compañero no válido en el Acompañante ${indexVisual}.`, 'warning'); return;
                     }
 
-                    // 1. REGISTRO PARA TU COMPAÑERO: Titular_dni es ÉL. No mandamos idFilaDb para que cree uno nuevo.
+                    // 1. CREACIÓN INDEPENDIENTE EN LA CUENTA DEL COMPAÑERO: Sin forzar un número de ranura fijo que rompa por duplicado
                     pasesParaUpsert.push({
                         titular_dni: dniDestinatario,
-                        numero_acompanante: 100 + numPosicion,
+                        numero_acompanante: 4, // Se insertará como un pase secuencial libre
                         nombre: "", apellidos: "", dni: null, parentesco: "Otros",
                         es_excepcion: false, cedido_por_dni: usuarioDni,
                         cedido_por_dni_destino: dniDestinatario
                     });
 
-                    // 2. REGISTRO DE BLOQUEO EN TU CUENTA: Guarda tu ranura física como cedida
+                    // 2. BLOQUEO EN TU PROPIA RANURA BASE ORIGINAL
                     const registroBloqueoEmisor = {
                         titular_dni: usuarioDni,
                         numero_acompanante: numPosicion,
@@ -337,10 +348,9 @@
                     pasesParaUpsert.push(registroBloqueoEmisor);
 
                 } else {
-                    // Si está vacío y no tiene ID previo en base de datos, lo ignoramos de forma limpia
+                    // FILTRO DE ENTRADA VACÍA: Si la tarjeta no se ha tocado, nos la saltamos olimpicamente. Cero errores.
                     if (!nombre && !apellidos && !dni && !fechaNac) continue;
 
-                    // Si ha empezado a rellenar, obligamos a completar la tarjeta
                     if (!nombre || !apellidos || !dni || !fechaNac || !parentesco) {
                         Swal.fire('Atención', `Por favor completa todos los campos del acompañante número ${indexVisual}.`, 'warning'); return;
                     }
@@ -375,7 +385,7 @@
                 Swal.fire({ title: '¡Guardado!', text: 'Los datos se han sincronizado con éxito.', icon: 'success' }).then(() => location.reload());
             } catch (e) {
                 console.error(e);
-                Swal.fire('Error', 'Sincronización fallida con Supabase.', 'error');
+                Swal.fire('Error', 'No se ha podido escribir en la base de datos debido a un conflicto de duplicados. Por favor contacta con administración.', 'error');
             }
         }
     </script>
