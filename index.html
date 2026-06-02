@@ -199,7 +199,6 @@
                     crearTarjetaEnPantalla(inv.es_excepcion, inv, inv.numero_acompanante);
                 });
             } else {
-                // CORREGIDO: Eliminado el error tipográfico "Pantaclea"
                 crearTarjetaEnPantalla(false, null, 1);
                 crearTarjetaEnPantalla(false, null, 2);
                 crearTarjetaEnPantalla(false, null, 3);
@@ -363,14 +362,14 @@
                 for (let g of letrasGradas) {
                     const capMax = CAPACIDADES_GRADAS[g];
                     const asientosOcupados = mapaOcupacion[g];
-                    const libres = capMax - asientosOcupados.length;
-                    if (libres >= tamanoFamilia) {
+                    const libresGrada = capMax - asientosOcupados.length;
+                    if (libresGrada >= tamanoFamilia) {
                         gradaSeleccionada = g;
                         let asignados = 0;
                         for (let a = 1; a <= capMax && asignados < tamanoFamilia; a++) {
                             if (!asientosOcupados.includes(a)) {
-                                listaAcompanantesValidos[assigned].asignacion_grada = g;
-                                listaAcompanantesValidos[assigned].asignacion_asiento = a;
+                                listaAcompanantesValidos[asignados].asignacion_grada = g;
+                                listaAcompanantesValidos[asignados].asignacion_asiento = a;
                                 asignados++;
                             }
                         }
