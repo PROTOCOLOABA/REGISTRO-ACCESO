@@ -173,7 +173,6 @@
             const container = document.getElementById('lista-invitados');
             container.innerHTML = "";
 
-            // Buscamos todos los pases vinculados a este DNI (propios base < 100 y extras recibidos > 100)
             const { data: existentes } = await _supabase
                 .from('invitados')
                 .select('*')
@@ -196,13 +195,11 @@
                 });
             }
 
-            // 1. Forzar e imprimir siempre las 3 ranuras reglamentarias
             for (let i = 1; i <= 3; i++) {
                 const datosInvitado = mapaPropios[i] || null;
                 crearTarjetaEnPantalla(false, datosInvitado, i, false);
             }
 
-            // 2. Imprimir las invitaciones extras que ha recibido de otros compañeros
             recibidosExtras.forEach(invCedido => {
                 crearTarjetaEnPantalla(false, invCedido, invCedido.numero_acompanante, true);
             });
@@ -212,17 +209,14 @@
 
         function crearTarjetaEnPantalla(esExcepcion, datos = null, numeroFijo = null, esRecibida = false) {
             const container = document.getElementById('lista-invitados');
-
             const card = document.createElement('div');
-            // Interfaz Original: Si es recibida o excepción, se destaca visualmente con fondos tintados
+            
             card.className = `p-4 rounded-xl border-2 shadow-sm relative space-y-3 tarjeta-dinamica ${esRecibida ? 'border-emerald-300 bg-emerald-50/50' : 'border-gray-200 bg-gray-50/50'}`;
             card.dataset.numeroAcompanante = numeroFijo;
             card.dataset.esRecibida = esRecibida;
 
-            // Detectamos si es una invitación propia que ya consta como cedida hacia un tercero en la BD
             const yaCedidaHaciaAfuera = !esRecibida && datos && datos.cedido_por_dni && datos.cedido_por_dni !== "" && datos.dni === "CEDIDO";
 
-            // El bloque de cesión sólo se permite en las 3 tarjetas reglamentarias iniciales
             const bloqueCeder = !esRecibida 
                 ? `<div class="bg-indigo-50/50 p-2 rounded-lg border border-indigo-100 flex flex-col gap-2 mt-1">
                     <label class="flex items-center gap-2 text-xs font-bold text-indigo-900 cursor-pointer select-none">
@@ -236,7 +230,6 @@
                    </div>`
                 : '';
 
-            // Si es recibida, mostramos un tag indicando la procedencia original
             const badgeCabecera = esRecibida 
                 ? `<span class="text-[10px] bg-emerald-200 text-emerald-800 font-bold px-2 py-0.5 rounded-lg">Recibida de: ${datos?.cedido_por_dni || ''}</span>`
                 : '';
@@ -324,7 +317,6 @@
                 const numPosicion = parseInt(card.dataset.numeroAcompanante);
                 const esRecibida = card.dataset.esRecibida === "true";
 
-                // Caso 1: Tarjetas reglamentarias propias
                 if (!esRecibida) {
                     const checkCeder = card.querySelector('.check-ceder-entrada');
                     const esCedida = checkCeder && checkCeder.checked;
@@ -345,7 +337,6 @@
                             return;
                         }
 
-                        // Se asigna al DNI destino en ranura libre > 100 para que se acople con sus pases
                         const ranuraEspecial = 100 + numPosicion; 
 
                         listaParaUpsert.push({
@@ -359,15 +350,13 @@
                             motivo_excepcion: null,
                             zona_discapacidad: requiereZonaAdaptada,
                             fecha_nacimiento: null, 
-                            edad_actual: null,
-                            cedido_por_dni: usuarioDni // Mantenemos constancia de quién la cedió
+                            text_edad: null,
+                            cedido_por_dni: usuarioDni
                         });
 
-                        // Guardamos referencia para purgar tu ranura base (1, 2 o 3) y que desaparezca de tu cuenta
                         idsParaBorrarOriginal.push({ dni: usuarioDni, slot: numPosicion });
 
                     } else {
-                        // Recogemos campos normales
                         const nombre = card.querySelector('.inv-nombre').value.trim();
                         const apellidos = card.querySelector('.inv-apellidos').value.trim();
                         const dni = card.querySelector('.inv-dni').value.trim().toUpperCase();
@@ -413,7 +402,6 @@
                                 cedido_por_dni: null
                             });
                         } else {
-                            // Limpieza por si dejas el slot vacío por completo
                             listaParaUpsert.push({
                                 titular_dni: usuarioDni,
                                 numero_acompanante: numPosicion,
@@ -423,9 +411,7 @@
                             });
                         }
                     }
-                } 
-                // Caso 2: Modificando tarjetas extras recibidas de otros compañeros
-                else if (esRecibida) {
+                } else if (esRecibida) {
                     const nombre = card.querySelector('.inv-nombre').value.trim();
                     const apellidos = card.querySelector('.inv-apellidos').value.trim();
                     const dni = card.querySelector('.inv-dni').value.trim().toUpperCase();
@@ -444,7 +430,6 @@
 
                         const edadCalculada = calcularEdadExacta(fechaNac);
 
-                        // Recuperamos los datos de origen para no perder quién te la envió
                         const { data: viejo } = await _supabase
                             .from('invitados')
                             .select('cedido_por_dni')
@@ -473,22 +458,30 @@
             Swal.fire({ title: 'Guardando cambios...', didOpen: () => Swal.showLoading(), allowOutsideClick: false });
 
             try {
-                // 1. Guardar o actualizar todos los registros procesados
-                if (listaParaUpsert.length > 0) {
-                    const { error } = await _supabase
-                        .from('invitados')
-                        .upsert(listaParaUpsert, { onConflict: 'titular_dni,numero_acompanante' });
+                const operaciones = [];
 
-                    if (error) throw error;
+                if (listaParaUpsert.length > 0) {
+                    operaciones.push(
+                        _supabase
+                            .from('invitados')
+                            .upsert(listaParaUpsert, { onConflict: 'titular_dni,numero_acompanante' })
+                    );
                 }
 
-                // 2. Limpiar ranuras base de origen si han sido cedidas a compañeros
                 for (let rem of idsParaBorrarOriginal) {
-                    await _supabase
-                        .from('invitados')
-                        .delete()
-                        .eq('titular_dni', rem.dni)
-                        .eq('numero_acompanante', rem.slot);
+                    operaciones.push(
+                        _supabase
+                            .from('invitados')
+                            .delete()
+                            .eq('titular_dni', rem.dni)
+                            .eq('numero_acompanante', rem.slot)
+                    );
+                }
+
+                const resultados = await Promise.all(operaciones);
+                
+                for (let res of resultados) {
+                    if (res.error) throw res.error;
                 }
 
                 Swal.fire({
