@@ -179,15 +179,15 @@
             const container = document.getElementById('lista-invitados');
             container.innerHTML = "";
 
-            // 1. Descargamos las invitaciones donde el propietario original sea este DNI
+            // 1. Descargamos las invitaciones registradas a nombre de este DNI
             const { data: deMiPropiedad } = await _supabase
                 .from('invitados')
                 .select('*')
                 .eq('titular_dni', usuarioDni)
                 .order('numero_acompanante', { ascending: true });
 
-            // 2. Descargamos las invitaciones que OTRAS personas le han cedido a este DNI
-            const { data: cedidasA MiCuenta } = await _supabase
+            // 2. Descargamos las invitaciones que OTRAS personas le han cedido a este DNI (CORREGIDO ESPACIO)
+            const { data: cedidasAMiCuenta } = await _supabase
                 .from('invitados')
                 .select('*')
                 .eq('cedido_por_dni', usuarioDni);
@@ -217,7 +217,7 @@
                     .in('dni', dnisDuenosOriginales);
                 
                 if (datosDuenos) {
-                    datosDuenom.forEach(t => {
+                    datosDuenos.forEach(t => {
                         diccionarioNombresDuenos[t.dni] = `${t.nombre} ${t.apellido1}`;
                     });
                 }
@@ -233,10 +233,8 @@
 
                 if (baseGuardada) {
                     const estaCedidaAOtro = baseGuardada.cedido_por_dni && baseGuardada.cedido_por_dni !== "";
-                    // Si está cedida a otro, pasamos true para que pinte la vista bloqueada de salida
                     crearTarjetaEnPantalla(false, baseGuardada, r, estaCedidaAOtro);
                 } else {
-                    // Ranura limpia
                     crearTarjetaEnPantalla(false, null, r, false);
                 }
             }
@@ -244,7 +242,6 @@
             // --- PINTAR LAS TARJETAS EXTRAS QUE LE HAN REGALADO A ÉL ---
             recibidas.forEach(inv => {
                 const nombreHumanoDueno = diccionarioNombresDuenos[inv.titular_dni] || inv.titular_dni;
-                // Le pasamos un marcador especial indicando que es un pase de entrada cedido
                 crearTarjetaEnPantalla(false, inv, inv.numero_acompanante, false, nombreHumanoDueno, true);
             });
 
@@ -272,7 +269,6 @@
             card.dataset.esExcepcion = esExcepcion;
             card.dataset.numeroAcompanante = numeroFijo;
             
-            // Guardamos metadatos ocultos en la tarjeta para saber cómo procesarla al guardar
             if (esPaseRecibidoEntrada && datos) {
                 card.dataset.esRecibidaEntrada = "true";
                 card.dataset.duenoOriginalDni = datos.titular_dni;
@@ -390,8 +386,6 @@
             for (let card of tarjetas) {
                 const numPosicion = parseInt(card.dataset.numeroAcompanante);
                 const esExcepcion = card.dataset.esExcepcion === "true";
-                
-                // Leemos los metadatos de enrutamiento seguro
                 const esTarjetaRecibidaDeCompanero = card.dataset.esRecibidaEntrada === "true";
                 const duenoOriginalDni = card.dataset.duenoOriginalDni || null;
 
@@ -425,8 +419,6 @@
                         return;
                     }
 
-                    // ENRUTAMIENTO SEGURO: Se guarda en MI PROPIA CUENTA (titular_dni = usuarioDni)
-                    // pero rellenamos cedido_por_dni con el DNI de mi compañero. Cero fallos de permisos RLS.
                     listaParaUpsert.push({
                         titular_dni: usuarioDni, 
                         numero_acompanante: numPosicion,     
@@ -485,9 +477,6 @@
                             return;
                         }
 
-                        // Si es un pase que rellené desde mis pases extras recibidos, el titular_dni debe ser el de su dueño original
-                        // para que permanezca en su ranura, pero como lo estoy editando yo que soy el beneficiario autorizado,
-                        // rellenamos el objeto apuntando al DNI dueño original.
                         const dniDuenoDestino = esTarjetaRecibidaDeCompanero ? duenoOriginalDni : usuarioDni;
                         const dniCedidoCampoDestino = esTarjetaRecibidaDeCompanero ? usuarioDni : null;
 
