@@ -151,17 +151,20 @@
             const container = document.getElementById('lista-invitados');
             container.innerHTML = "";
 
-            // Descargamos las invitaciones de mi propiedad
+            // 1. Descargamos las invitaciones de mi propiedad
             const { data: mios } = await _supabase.from('invitados').select('*').eq('titular_dni', usuarioDni).order('numero_acompanante', { ascending: true });
             
-            // Descargamos las invitaciones que me han cedido a mí (donde cedido_por_dni es mi cuenta)
+            // 2. Descargamos las invitaciones que OTRAS personas me han cedido a mí
             const { data: cedidasAmi } = await _supabase.from('invitados').select('*').eq('cedido_por_dni', usuarioDni);
 
             const listadoMios = mios || [];
             const listadoCedidasAmi = cedidasAmi || [];
 
+            // Criba de pases base familiares propios
+            const pasesBasePropios = listadoMios.filter(inv => inv.numero_acompanante <= 3);
+
             // Marcar casilla de discapacidad propia
-            const algunFamiliarDiscapacitado = listadoMios.some(inv => !inv.cedido_por_dni && inv.zona_discapacidad === true);
+            const algunFamiliarDiscapacitado = pasesBasePropios.some(inv => !inv.cedido_por_dni && inv.zona_discapacidad === true);
             document.getElementById('check-discapacidad').checked = algunFamiliarDiscapacitado;
 
             // Buscamos nombres de los dueños que me han cedido algo
@@ -172,24 +175,28 @@
                 if (titularesDuenos) { titularesDuenos.forEach(t => { diccionarioNombres[t.dni] = `${t.nombre} ${t.apellido1}`; }); }
             }
 
-            // Pintamos las 3 ranuras base del alumno
+            // --- CORRECCIÓN INTEGRAL DE RANURAS EMISORAS ---
+            // Forzamos el bucle estricto de tus 3 ranuras reglamentarias
             for (let r = 1; r <= 3; r++) {
-                const registro = listadoMios.find(m => m.numero_acompanante === r);
+                const registro = pasesBasePropios.find(m => m.numero_acompanante === r);
+                
                 if (registro) {
                     const estaCedidaAOtro = registro.cedido_por_dni && registro.cedido_por_dni !== "";
+                    // Si el registro existe y tiene un DNI asignado en la columna cedido, se pinta bloqueada en su ranura correspondiente
                     crearTarjetaEnPantalla(false, registro, r, estaCedidaAOtro);
                 } else {
+                    // Si verdaderamente no hay nada guardado en esa ranura base (libre), se pinta en blanco
                     crearTarjetaEnPantalla(false, null, r, false);
                 }
             }
 
-            // Pintamos los pases extras que me han regalado a mí en blanco
+            // --- PINTAR LAS TARJETAS EXTRAS QUE LE HAN REGALADO A ÉL ---
             listadoCedidasAmi.forEach((inv, i) => {
                 const nombreDueno = diccionarioNombres[inv.titular_dni] || inv.titular_dni;
                 crearTarjetaEnPantalla(false, inv, 200 + i, false, nombreDueno, true);
             });
 
-            // Pintamos las excepciones
+            // --- PINTAR LAS EXCEPCIONES ---
             const excepciones = listadoMios.filter(m => m.numero_acompanante > 3);
             excepciones.forEach(inv => { crearTarjetaEnPantalla(true, inv, inv.numero_acompanante, false); });
 
@@ -209,7 +216,7 @@
             
             if (esPaseRecibido && datos) {
                 card.dataset.esPaseRecibido = "true";
-                card.dataset.duenoTablaId = datos.id; // Guardamos su ID exacto de fila
+                card.dataset.duenoTablaId = datos.id; 
             }
 
             const botonEliminar = esExcepcion ? `<button type="button" onclick="marcarComoEliminado(this)" class="text-red-500 font-bold text-xs bg-red-50 px-2 py-1 rounded-lg border border-red-200">Eliminar</button>` : '';
@@ -232,6 +239,7 @@
                    </div>`;
             }
 
+            // Ocultamos los datos familiares si la tarjeta ha sido cedida por el emisor actual
             card.innerHTML = `
                 <div class="flex justify-between items-center border-b pb-2 mb-2 ${esExcepcion ? 'border-amber-200' : 'border-gray-200'}">
                     <span class="titulo-tarjeta-prioridad text-xs uppercase font-extrabold tracking-wider ${esExcepcion ? 'text-amber-700' : 'text-gray-500'}">Acompañante --</span>
@@ -256,6 +264,7 @@
                         <option value="Otros" ${datos && !esBloqueoCedidaEmisor && datos.parentesco === 'Otros' ? 'selected' : ''}>Otro</option>
                     </select>
                 </div>
+                ${esExcepcion ? `<div class="mt-2"><textarea placeholder="Justificación breve..." class="inv-motivo w-full p-3 text-xs border border-amber-300 rounded-lg focus:outline-none" rows="2">${datos ? (datos.motivo_excepcion || '') : ''}</textarea></div>` : ''}
             `;
             container.appendChild(card);
             reordenarTitulosVisuales();
@@ -316,11 +325,11 @@
                 const checkCeder = card.querySelector('.check-ceder-entrada');
                 const esCedida = checkCeder && checkCeder.checked;
 
-                const nombre = card.querySelector('.inv-nombre').value.trim();
-                const apellidos = card.querySelector('.inv-apellidos').value.trim();
-                const dni = card.querySelector('.inv-dni').value.trim().toUpperCase();
-                const fechaNac = card.querySelector('.inv-fecha-nacimiento').value;
-                const parentesco = card.querySelector('.inv-parentesco').value;
+                const nombre = card.querySelector('.inv-nombre') ? card.querySelector('.inv-nombre').value.trim() : "";
+                const apellidos = card.querySelector('.inv-apellidos') ? card.querySelector('.inv-apellidos').value.trim() : "";
+                const dni = card.querySelector('.inv-dni') ? card.querySelector('.inv-dni').value.trim().toUpperCase() : "";
+                const fechaNac = card.querySelector('.inv-fecha-nacimiento') ? card.querySelector('.inv-fecha-nacimiento').value : "";
+                const parentesco = card.querySelector('.inv-parentesco') ? card.querySelector('.inv-parentesco').value : "";
 
                 if (esCedida) {
                     const dniBeneficiario = card.querySelector('.inv-cedido-dni').value.trim().toUpperCase();
@@ -328,14 +337,13 @@
                         Swal.fire('Error', 'Comprueba el DNI del compañero beneficiario.', 'warning'); return;
                     }
 
-                    // Se guarda en mi propia cuenta apuntando a él en la columna cedido_por_dni
                     listaUpsertPropios.push({
                         titular_dni: usuarioDni, numero_acompanante: numPosicion, nombre: "", apellidos: "", 
                         dni: null, parentesco: "Otros", es_excepcion: false, motivo_excepcion: null,
                         zona_discapacidad: false, fecha_nacimiento: null, edad_actual: null, cedido_por_dni: dniBeneficiario
                     });
                 } else {
-                    if (!nombre && !apellidos && !dni && !fechaNac) continue;
+                    if (!nombre && !apellidos && !dni && !fechaNac && !esPaseRecibido) continue;
 
                     if (!nombre || !apellidos || !dni || !fechaNac || !parentesco) {
                         Swal.fire('Atención', `Completa todos los campos del Acompañante ${indexVisual}.`, 'warning'); return;
@@ -365,17 +373,14 @@
             Swal.fire({ title: 'Guardando confirmaciones...', didOpen: () => Swal.showLoading(), allowOutsideClick: false });
 
             try {
-                // Guardamos mis pases propios
                 if (listaUpsertPropios.length > 0) {
                     const { error } = await _supabase.from('invitados').upsert(listaUpsertPropios, { onConflict: 'titular_dni,numero_acompanante' });
                     if (error) throw error;
                 }
-                // Guardamos las modificaciones sobre las filas que me han cedido a mí (vía su ID único)
                 if (listaUpdatesCedidosRecibidos.length > 0) {
                     const { error } = await _supabase.from('invitados').upsert(listaUpdatesCedidosRecibidos);
                     if (error) throw error;
                 }
-
                 Swal.fire({ title: '¡Guardado!', text: 'Procesado con éxito.', icon: 'success' }).then(() => location.reload());
             } catch (e) { Swal.fire('Error', 'Sincronización fallida.', 'error'); }
         }
