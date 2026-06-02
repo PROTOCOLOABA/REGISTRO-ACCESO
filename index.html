@@ -179,48 +179,78 @@
             const container = document.getElementById('lista-invitados');
             container.innerHTML = "";
 
-            const { data: existentes } = await _supabase
+            // 1. Descargamos las invitaciones guardadas a nombre de este DNI
+            const { data: guardadas } = await _supabase
                 .from('invitados')
                 .select('*')
                 .eq('titular_dni', usuarioDni)
                 .order('numero_acompanante', { ascending: true });
 
-            if (existentes && existentes.length > 0) {
-                const algunDiscapacitado = existentes.some(inv => inv.zona_discapacidad === true);
-                document.getElementById('check-discapacidad').checked = algunDiscapacitado;
+            // 2. Descargamos si este DNI cedió pases a otros (para marcárselas como bloqueadas en su pantalla)
+            const { data: cesionesRealizadas } = await _supabase
+                .from('invitados')
+                .select('*')
+                .eq('cedido_por_dni', usuarioDni);
 
-                const pasesBaseGuardados = existentes.filter(inv => inv.numero_acompanante <= 3 || inv.numero_acompanante > 100);
-                const pasesExcepcionalesGuardados = existentes.filter(inv => inv.numero_acompanante > 3 && inv.numero_acompanante <= 100);
+            const listadoPropios = guardadas || [];
+            const listadoCesiones = cesionesRealizadas || [];
 
-                pasesBaseGuardados.forEach(inv => {
-                    let ranuraReal = inv.numero_acompanante > 100 ? (inv.numero_acompanante - 100) : inv.numero_acompanante;
-                    crearTarjetaEnPantalla(false, inv, ranuraReal);
-                });
+            // Estructuras de separación
+            const pasesBasePropios = [];
+            const pasesCedidosRecibidos = [];
+            const excepcionesPropias = [];
 
-                const slotsOcupados = pasesBaseGuardados.map(inv => inv.numero_acompanante > 100 ? (inv.numero_acompanante - 100) : inv.numero_acompanante);
-                for (let r = 1; r <= 3; r++) {
-                    if (!slotsOcupados.includes(r)) {
-                        crearTarjetaEnPantalla(false, null, r);
-                    }
+            listadoPropios.forEach(inv => {
+                if (inv.numero_acompanante <= 3) {
+                    pasesBasePropios.push(inv);
+                } else if (inv.numero_acompanante > 100) {
+                    // Es un pase que le cedieron a este alumno (ranura 101, 102, 103)
+                    pasesCedidosRecibidos.push(inv);
+                } else {
+                    excepcionesPropias.push(inv);
                 }
+            });
 
-                pasesExcepcionalesGuardados.forEach(inv => {
-                    crearTarjetaEnPantalla(true, inv, inv.numero_acompanante);
-                });
+            // Buscamos si hay pases que marcar como discapacidad (excluyendo cesiones)
+            const algunFamiliarDiscapacitado = listadoPropios.some(inv => inv.numero_acompanante <= 100 && inv.zona_discapacidad === true);
+            document.getElementById('check-discapacidad').checked = algunFamiliarDiscapacitado;
 
-                const maxNum = existentes.reduce((max, inv) => inv.numero_acompanante > max ? inv.numero_acompanante : max, 3);
-                maxAcompanantesHistoricos = maxNum > 100 ? 3 : maxNum;
+            // --- PASO CRÍTICO: PINTAR LAS 3 INVITACIONES BASE REGLAMENTARIAS ---
+            for (let r = 1; r <= 3; r++) {
+                // ¿Esta ranura la cedió a un compañero?
+                const cesionEfectuada = listadoCesiones.find(c => (c.numero_acompanante > 100 ? (c.numero_acompanante - 100) : c.numero_acompanante) === r);
+                // ¿Esta ranura tiene datos familiares guardados normales?
+                const baseGuardada = pasesBasePropios.find(b => b.numero_acompanante === r);
 
-            } else {
-                crearTarjetaEnPantalla(false, null, 1);
-                crearTarjetaEnPantalla(false, null, 2);
-                crearTarjetaEnPantalla(false, null, 3);
-                maxAcompanantesHistoricos = 3;
+                if (cesionEfectuada) {
+                    // Muestra la tarjeta bloqueada indicando a quién se la cedió
+                    crearTarjetaEnPantalla(false, cesionEfectuada, r, true);
+                } else if (baseGuardada) {
+                    // Muestra la tarjeta con los datos de su familiar
+                    crearTarjetaEnPantalla(false, baseGuardada, r, false);
+                } else {
+                    // Muestra la ranura limpia en blanco disponible para usar
+                    crearTarjetaEnPantalla(false, null, r, false);
+                }
             }
+
+            // --- PASO EXTRA: PINTAR LOS PASES QUE LE HAN CEDIDO A ÉL ---
+            pasesCedidosRecibidos.forEach(inv => {
+                crearTarjetaEnPantalla(false, inv, inv.numero_acompanante, false);
+            });
+
+            // --- PASO FINAL: PINTAR SUS CASOS EXCEPCIONALES ---
+            excepcionesPropias.forEach(inv => {
+                crearTarjetaEnPantalla(true, inv, inv.numero_acompanante, false);
+            });
+
+            const maxNum = listadoPropios.reduce((max, inv) => inv.numero_acompanante > max ? inv.numero_acompanante : max, 3);
+            maxAcompanantesHistoricos = maxNum > 100 ? 3 : maxNum;
+
             reordenarTitulosVisuales();
         }
 
-        function crearTarjetaEnPantalla(esExcepcion, datos = null, numeroFijo = null) {
+        function crearTarjetaEnPantalla(esExcepcion, datos = null, numeroFijo = null, esBloqueoCedidaEmisor = false) {
             const container = document.getElementById('lista-invitados');
             
             if (!numeroFijo) {
@@ -237,20 +267,32 @@
                 ? `<button type="button" onclick="marcarComoEliminado(this)" class="text-red-500 font-bold text-xs bg-red-50 px-2 py-1 rounded-lg border border-red-200">Eliminar</button>`
                 : '';
 
-            const yaCedida = datos && (datos.cedido_por_dni && datos.cedido_por_dni !== "" || datos.dni === "CEDIDO");
+            // Detectamos si es una tarjeta que este alumno recibió de un compañero (ranura > 100 o con campo cedido_por_dni)
+            const esRecibidaDeCompanero = datos && datos.cedido_por_dni && datos.cedido_por_dni !== "" && datos.cedido_por_dni !== usuarioDni;
             
-            const bloqueCeder = !esExcepcion 
-                ? `<div class="bg-indigo-50/50 p-2 rounded-lg border border-indigo-100 flex flex-col gap-2 mt-1">
+            let bloqueCeder = '';
+            let avisoCabeceraExtra = '';
+
+            if (esRecibidaDeCompanero) {
+                // Mensaje informativo para el compañero beneficiario: tiene los campos vacíos pero ve quién se la dio
+                card.dataset.cedidoPorDni = datos.cedido_por_dni; 
+                avisoCabeceraExtra = `<div class="text-[11px] bg-green-50 text-green-700 font-bold px-2 py-1 rounded-md border border-green-200 mt-1">🎁 Invitación cedida por tu compañero: ${datos.cedido_por_dni}</div>`;
+            } else if (!esExcepcion) {
+                // Selector de cesión estándar para sus pases base propios
+                bloqueCeder = `<div class="bg-indigo-50/50 p-2 rounded-lg border border-indigo-100 flex flex-col gap-2 mt-1">
                     <label class="flex items-center gap-2 text-xs font-bold text-indigo-900 cursor-pointer select-none">
-                        <input type="checkbox" class="check-ceder-entrada w-4 h-4 text-indigo-600 rounded focus:ring-indigo-500 cursor-pointer" onchange="conmutarCesion(this)" ${yaCedida ? 'checked' : ''}>
+                        <input type="checkbox" class="check-ceder-entrada w-4 h-4 text-indigo-600 rounded focus:ring-indigo-500 cursor-pointer" onchange="conmutarCesion(this)" ${esBloqueoCedidaEmisor ? 'checked' : ''}>
                         👉 Ceder esta invitación a un compañero
                     </label>
-                    <div class="capa-dni-companero ${yaCedida ? '' : 'hidden'}">
+                    <div class="capa-dni-companero ${esBloqueoCedidaEmisor ? '' : 'hidden'}">
                         <label class="block text-[10px] font-bold text-indigo-500 uppercase tracking-wider mb-1 ml-0.5">DNI/NIE del alumno beneficiario</label>
-                        <input type="text" placeholder="Ej: 87654321X" class="inv-cedido-dni w-full p-2.5 text-sm border-2 border-indigo-300 rounded-lg uppercase bg-white focus:outline-none focus:border-indigo-600 font-semibold" value="${yaCedida ? (datos.cedido_por_dni ? datos.titular_dni : '') : ''}">
+                        <input type="text" placeholder="Ej: 87654321X" class="inv-cedido-dni w-full p-2.5 text-sm border-2 border-indigo-300 rounded-lg uppercase bg-white focus:outline-none focus:border-indigo-600 font-semibold" value="${esBloqueoCedidaEmisor ? datos.titular_dni : ''}">
                     </div>
-                   </div>`
-                : '';
+                   </div>`;
+            }
+
+            // Si el alumno emisor ya la cedió, ocultamos los campos normales familiares
+            const ocultarCamposNormales = esBloqueoCedidaEmisor;
 
             card.innerHTML = `
                 <div class="flex justify-between items-center border-b pb-2 mb-2 ${esExcepcion ? 'border-amber-200' : 'border-gray-200'}">
@@ -260,25 +302,26 @@
                     ${botonEliminar}
                 </div>
                 
+                ${avisoCabeceraExtra}
                 ${bloqueCeder}
 
-                <div class="capa-datos-familiares grid grid-cols-1 gap-2 ${yaCedida ? 'hidden' : ''}">
-                    <input type="text" placeholder="Nombre completo" class="inv-nombre w-full p-3 text-sm border rounded-lg focus:outline-none" value="${datos && !yaCedida ? datos.nombre : ''}">
-                    <input type="text" placeholder="Apellidos" class="inv-apellidos w-full p-3 text-sm border rounded-lg focus:outline-none" value="${datos && !yaCedida ? datos.apellidos : ''}">
-                    <input type="text" placeholder="DNI / NIE del acompañante" class="inv-dni w-full p-3 text-sm border rounded-lg uppercase focus:outline-none" value="${datos && !yaCedida ? (datos.dni || '') : ''}">
+                <div class="capa-datos-familiares grid grid-cols-1 gap-2 ${ocultarCamposNormales ? 'hidden' : ''}">
+                    <input type="text" placeholder="Nombre completo" class="inv-nombre w-full p-3 text-sm border rounded-lg focus:outline-none" value="${datos && !esBloqueoCedidaEmisor && datos.nombre !== 'Pase Cedido' ? datos.nombre : ''}">
+                    <input type="text" placeholder="Apellidos" class="inv-apellidos w-full p-3 text-sm border rounded-lg focus:outline-none" value="${datos && !esBloqueoCedidaEmisor && !datos.apellidos.startsWith('Por ') ? datos.apellidos : ''}">
+                    <input type="text" placeholder="DNI / NIE del acompañante" class="inv-dni w-full p-3 text-sm border rounded-lg uppercase focus:outline-none" value="${datos && !esBloqueoCedidaEmisor && datos.dni !== 'CEDIDO' ? (datos.dni || '') : ''}">
                     
                     <div>
                         <label class="block text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-1 ml-1">Fecha de Nacimiento</label>
-                        <input type="date" class="inv-fecha-nacimiento w-full p-3 text-sm border rounded-lg bg-white focus:outline-none text-gray-700" value="${datos && !yaCedida ? datos.fecha_nacimiento : ''}">
+                        <input type="date" class="inv-fecha-nacimiento w-full p-3 text-sm border rounded-lg bg-white focus:outline-none text-gray-700" value="${datos && !esBloqueoCedidaEmisor && datos.fecha_nacimiento !== '2000-01-01' ? datos.fecha_nacimiento : ''}">
                     </div>
 
                     <select class="inv-parentesco w-full p-3 text-sm border rounded-lg bg-white focus:outline-none">
-                        <option value="" disabled ${!datos || yaCedida ? 'selected' : ''}>Selecciona parentesco</option>
-                        <option value="Pareja" ${datos && !yaCedida && datos.parentesco === 'Pareja' ? 'selected' : ''}>Pareja</option>
-                        <option value="Hijo/a" ${datos && !yaCedida && datos.parentesco === 'Hijo/a' ? 'selected' : ''}>Hijo/a</option>
-                        <option value="Padre/Madre" ${datos && !yaCedida && datos.parentesco === 'Padre/Madre' ? 'selected' : ''}>Padre/Madre</option>
-                        <option value="Hermano/a" ${datos && !yaCedida && datos.parentesco === 'Hermano/a' ? 'selected' : ''}>Hermano/a</option>
-                        <option value="Otros" ${datos && !yaCedida && datos.parentesco === 'Otros' ? 'selected' : ''}>Otro</option>
+                        <option value="" disabled ${!datos || esBloqueoCedidaEmisor || datos.nombre === 'Pase Cedido' ? 'selected' : ''}>Selecciona parentesco</option>
+                        <option value="Pareja" ${datos && !esBloqueoCedidaEmisor && datos.parentesco === 'Pareja' ? 'selected' : ''}>Pareja</option>
+                        <option value="Hijo/a" ${datos && !esBloqueoCedidaEmisor && datos.parentesco === 'Hijo/a' ? 'selected' : ''}>Hijo/a</option>
+                        <option value="Padre/Madre" ${datos && !esBloqueoCedidaEmisor && datos.parentesco === 'Padre/Madre' ? 'selected' : ''}>Padre/Madre</option>
+                        <option value="Hermano/a" ${datos && !esBloqueoCedidaEmisor && datos.parentesco === 'Hermano/a' ? 'selected' : ''}>Hermano/a</option>
+                        <option value="Otros" ${datos && !esBloqueoCedidaEmisor && datos.parentesco === 'Otros' ? 'selected' : ''}>Otro</option>
                     </select>
                 </div>
                 ${esExcepcion ? `<div class="mt-2"><textarea placeholder="Justificación breve..." class="inv-motivo w-full p-3 text-xs border border-amber-300 rounded-lg focus:outline-none" rows="2">${datos ? (datos.motivo_excepcion || '') : ''}</textarea></div>` : ''}
@@ -335,6 +378,7 @@
             for (let card of tarjetas) {
                 const numPosicion = parseInt(card.dataset.numeroAcompanante);
                 const esExcepcion = card.dataset.esExcepcion === "true";
+                const cedidoPorDniOrigen = card.dataset.cedidoPorDni || null;
 
                 if (card.classList.contains('para-borrar')) {
                     listaParaUpsert.push({
@@ -362,7 +406,7 @@
                         return;
                     }
                     if (dniBeneficiario === usuarioDni) {
-                        Swal.fire('Error', `No puedes cederte una entrada a ti mismo en el Acompañante ${indexVisual}.`, 'warning');
+                        Swal.fire('Error', `No puedes cederte una entrada a ti mismo.`, 'warning');
                         return;
                     }
 
@@ -372,8 +416,8 @@
                         titular_dni: dniBeneficiario, numero_acompanante: ranuraEspecial,     
                         nombre: "Pase Cedido", apellidos: `Por ${usuarioDni}`, dni: "CEDIDO",
                         parentesco: "Otros", es_excepcion: false, motivo_excepcion: null,
-                        zona_discapacidad: requiereZonaAdaptada, fecha_nacimiento: "2000-01-01", 
-                        edad_actual: 26, cedido_por_dni: usuarioDni, asignacion_grada: "CEDIDO", asignacion_asiento: 0
+                        zona_discapacidad: false, fecha_nacimiento: "2000-01-01", 
+                        edad_actual: 26, cedido_por_dni: usuarioDni, asignacion_grada: null, asignacion_asiento: null
                     });
 
                 } else {
@@ -418,10 +462,18 @@
                         }
 
                         listaParaUpsert.push({
-                            titular_dni: usuarioDni, numero_acompanante: numPosicion, nombre: nombre, apellidos: apellidos,
-                            dni: dni, parentesco: parentesco, es_excepcion: esExcepcion, motivo_excepcion: motivo,
-                            zona_discapacidad: requiereZonaAdaptada, fecha_nacimiento: fechaNac, edad_actual: edadCalculada,
-                            cedido_por_dni: null, asignacion_grada: null, asignacion_asiento: null
+                            titular_dni: usuarioDni, 
+                            numero_acompanante: numPosicion, 
+                            nombre: nombre, 
+                            apellidos: apellidos,
+                            dni: dni, 
+                            parentesco: parentesco, 
+                            es_excepcion: esExcepcion, 
+                            motivo_excepcion: motivo,
+                            zona_discapacidad: requiereZonaAdaptada, 
+                            fecha_nacimiento: fechaNac, 
+                            edad_actual: edadCalculada,
+                            cedido_por_dni: cedidoPorDniOrigen // Mantiene la constancia de quién se la dio
                         });
                     }
                 }
@@ -440,7 +492,7 @@
 
                 Swal.fire({
                     title: '¡Todo guardado!',
-                    text: 'Tus invitaciones han sido registradas. Los asientos finales se calcularán tras el cierre de solicitudes.',
+                    text: 'Las invitaciones han sido registradas. Los pases se calcularán tras el cierre de solicitudes.',
                     icon: 'success',
                     confirmButtonColor: '#4f46e5'
                 }).then(() => location.reload());
