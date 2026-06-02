@@ -17,7 +17,6 @@
             <p class="text-indigo-200 text-sm mt-1">Confirmación y Gestión de Invitados</p>
         </header>
 
-        <!-- PANTALLA 1: LOGIN -->
         <div id="pantalla-login" class="p-6 flex-grow flex flex-col justify-center items-center">
             <div class="w-full space-y-4">
                 <div class="text-center mb-6">
@@ -27,13 +26,12 @@
                     <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Tu Documento de Identidad</label>
                     <input type="text" id="login-dni" placeholder="Ej: 12345678Z" class="w-full p-4 border-2 border-gray-300 rounded-xl text-lg font-semibold uppercase focus:border-indigo-500 focus:outline-none">
                 </div>
-                <button onclick="verificarAccAccess()" class="w-full bg-indigo-600 text-white font-bold p-4 rounded-xl shadow-md text-lg">
+                <button onclick="verificarAcceso()" class="w-full bg-indigo-600 text-white font-bold p-4 rounded-xl shadow-md text-lg">
                     Acceder al Formulario
                 </button>
             </div>
         </div>
 
-        <!-- PANTALLA 2: FORMULARIO -->
         <div id="pantalla-formulario" class="p-6 flex-grow hidden space-y-6">
             <div class="bg-indigo-50 p-4 rounded-xl border border-indigo-100">
                 <span class="text-xs uppercase font-bold text-indigo-500 tracking-wider">Titular Autorizado</span>
@@ -45,17 +43,14 @@
 
             <form id="form-invitados" onsubmit="guardarDatos(event)" class="space-y-6">
                 
-                <!-- CONTENEDOR DE TARJETAS DINÁMICAS (BASE, CEDIDAS Y EXCEPCIONALES) -->
                 <div id="lista-invitados" class="space-y-4"></div>
 
-                <!-- BOTONERA PARA AÑADIR INVITACIONES EXCEPCIONALES -->
                 <div class="flex justify-center">
                     <button type="button" onclick="crearTarjetaExcepcionalVacia()" class="w-full border-2 border-dashed border-amber-400 text-amber-800 bg-amber-50 font-bold p-3 rounded-xl flex items-center justify-center gap-2 hover:bg-amber-100 transition-colors text-sm shadow-sm">
                         <span>➕ Solicitar Caso Excepcional</span>
                     </button>
                 </div>
 
-                <!-- CASILLA: ZONA HABILITADA DISCAPACIDAD -->
                 <div class="bg-blue-50 p-4 rounded-xl border border-blue-200 mt-4">
                     <div class="flex items-start">
                         <div class="flex items-center h-5">
@@ -70,7 +65,6 @@
                     </div>
                 </div>
 
-                <!-- CASILLA LEGAL LOPD -->
                 <div class="bg-gray-50 p-4 rounded-xl border border-gray-200">
                     <div class="flex items-start">
                         <div class="flex items-center h-5">
@@ -101,7 +95,7 @@
         const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
         let usuarioDni = "";
-        let maxRanuraExcepcionales = 1000; // Indice interno de control para las nuevas ranuras de casos excepcionales
+        let maxRanuraExcepcionales = 1000;
 
         function validarDniNie(documento) {
             const regex = /^[XYZ\d]\d{7}[A-Z]$/i;
@@ -136,7 +130,7 @@
             return edad;
         }
 
-        async function verificarAccAccess() {
+        async function verificarAcceso() {
             const inputDni = document.getElementById('login-dni').value.trim().toUpperCase();
             
             if(!inputDni) {
@@ -178,6 +172,7 @@
                 Swal.close();
 
             } catch (err) {
+                console.error(err);
                 Swal.fire('Error', 'Hubo un problema al conectar con el servidor.', 'error');
             }
         }
@@ -216,18 +211,15 @@
                 });
             }
 
-            // 1. Pintamos de forma estricta los 3 pases reglamentarios
             for (let i = 1; i <= 3; i++) {
                 const datosInvitado = mapaPropios[i] || null;
                 crearTarjetaEnPantalla(false, datosInvitado, i, "propia");
             }
 
-            // 2. Pintamos las tarjetas extras recibidas de otros compañeros
             recibidosExtras.forEach(invCedido => {
                 crearTarjetaEnPantalla(false, invCedido, invCedido.numero_acompanante, "recibida");
             });
 
-            // 3. Pintamos los casos excepcionales que ya estaban registrados en la BD
             excepcionalesGuardadas.forEach(invExcep => {
                 crearTarjetaEnPantalla(true, invExcep, invExcep.numero_acompanante, "excepcional");
             });
@@ -246,7 +238,6 @@
             
             const yaCedidaHaciaAfuera = tipoTarjeta === "propia" && datos && datos.cedido_por_dni && datos.cedido_por_dni !== "" && datos.dni === "CEDIDO";
 
-            // Asignación de estilos css originales según el tipo
             if (tipoTarjeta === "excepcional") {
                 card.className = "p-4 rounded-xl border-2 shadow-sm relative space-y-3 tarjeta-dinamica border-amber-300 bg-amber-50/50";
             } else if (tipoTarjeta === "recibida") {
@@ -259,7 +250,6 @@
             card.dataset.tipoTarjeta = tipoTarjeta;
             card.dataset.estaBloqueada = yaCedidaHaciaAfuera;
 
-            // Bloque superior/Botonera según el caso
             let bloqueCeder = '';
             let botonEliminar = '';
 
@@ -334,7 +324,7 @@
                 </div>
             `;
             container.appendChild(card);
-            reordenarTitulesVisuales();
+            reordenarTitulosVisuales();
         }
 
         function conmutarCesion(check) {
@@ -353,7 +343,6 @@
 
         function eliminarTarjetaExcepcional(btn) {
             const card = btn.closest('.tarjeta-dinamica');
-            // Si ya existía en la base de datos de Supabase, la marcamos visualmente para borrarla físicamente al guardar
             card.classList.add('hidden', 'para-borrar-excepcion');
             reordenarTitulosVisuales();
         }
@@ -404,7 +393,6 @@
                 const tipoTarjeta = card.dataset.tipoTarjeta;
                 const estaBloqueada = card.dataset.estaBloqueada === "true";
 
-                // Si se marcó para eliminar un caso excepcional existente, guardamos la referencia de borrado
                 if (card.classList.contains('para-borrar-excepcion')) {
                     idsExcepcionalesParaBorrar.push(numPosicion);
                     continue;
@@ -434,7 +422,6 @@
                             return;
                         }
 
-                        // Registro 1: Bloqueo en tu cuenta
                         listaParaUpsert.push({
                             titular_dni: usuarioDni, 
                             numero_acompanante: numPosicion,     
@@ -444,7 +431,6 @@
                             cedido_por_dni: dniBeneficiario
                         });
 
-                        // Registro 2: Copia en el panel del compañero (ranura >100)
                         listaParaUpsert.push({
                             titular_dni: dniBeneficiario, 
                             numero_acompanante: 100 + numPosicion,     
@@ -455,7 +441,6 @@
                         });
 
                     } else {
-                        // Flujo normal de tus acompañantes base
                         const nombre = card.querySelector('.inv-nombre').value.trim();
                         const apellidos = card.querySelector('.inv-apellidos').value.trim();
                         const dni = card.querySelector('.inv-dni').value.trim().toUpperCase();
@@ -483,7 +468,6 @@
                                 cedido_por_dni: null
                             });
                         } else {
-                            // Limpiar si el usuario deja la tarjeta en blanco
                             listaParaUpsert.push({
                                 titular_dni: usuarioDni, numero_acompanante: numPosicion,
                                 nombre: null, apellidos: null, dni: null, parentesco: "Otros",
@@ -517,7 +501,6 @@
 
                         const edadCalculada = calcularEdadExacta(fechaNac);
 
-                        // Si es recibida mantenemos su remitente
                         let remitente = null;
                         if (tipoTarjeta === "recibida") {
                             const badgeText = card.querySelector('.titulo-tarjeta-prioridad').nextElementSibling.innerText;
@@ -540,7 +523,6 @@
             Swal.fire({ title: 'Guardando cambios...', didOpen: () => Swal.showLoading(), allowOutsideClick: false });
 
             try {
-                // 1. Borramos físicamente de Supabase las tarjetas excepcionales eliminadas
                 if (idsExcepcionalesParaBorrar.length > 0) {
                     for (let slotBorrar of idsExcepcionalesParaBorrar) {
                         await _supabase
@@ -551,7 +533,6 @@
                     }
                 }
 
-                // 2. Ejecutamos el guardado de todo el lote (propias, cedidas y excepcionales nuevas/editadas)
                 if (listaParaUpsert.length > 0) {
                     const { error } = await _supabase
                         .from('invitados')
