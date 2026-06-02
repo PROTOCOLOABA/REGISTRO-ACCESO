@@ -195,11 +195,13 @@
                 });
             }
 
+            // Renderizar slots base reglamentarios
             for (let i = 1; i <= 3; i++) {
                 const datosInvitado = mapaPropios[i] || null;
                 crearTarjetaEnPantalla(false, datosInvitado, i, false);
             }
 
+            // Renderizar pases extras recibidos de compañeros
             recibidosExtras.forEach(invCedido => {
                 crearTarjetaEnPantalla(false, invCedido, invCedido.numero_acompanante, true);
             });
@@ -351,10 +353,11 @@
                             zona_discapacidad: requiereZonaAdaptada,
                             fecha_nacimiento: null, 
                             edad_actual: null,
-                            cedido_por_dni: usuarioDni
+                            cedido_por_dni: usuarioDni // <--- CRÍTICO: Indica quién realiza la cesión original
                         });
 
-                        idsParaBorrarOriginal.push({ dni: usuarioDni, slot: numPosicion });
+                        // Guardamos de forma explícita qué ranura de TU DNI original se debe purgar
+                        idsParaBorrarOriginal.push({ dniAEliminar: usuarioDni, slotAEliminar: numPosicion });
 
                     } else {
                         const nombre = card.querySelector('.inv-nombre').value.trim();
@@ -458,30 +461,23 @@
             Swal.fire({ title: 'Guardando cambios...', didOpen: () => Swal.showLoading(), allowOutsideClick: false });
 
             try {
-                const operaciones = [];
-
-                if (listaParaUpsert.length > 0) {
-                    operaciones.push(
-                        _supabase
-                            .from('invitados')
-                            .upsert(listaParaUpsert, { onConflict: 'titular_dni,numero_acompanante' })
-                    );
-                }
-
-                for (let rem of idsParaBorrarOriginal) {
-                    operaciones.push(
-                        _supabase
+                // PRIMERO: Purgamos tus ranuras originales del DNI emisor para evitar duplicidad fantasma
+                if (idsParaBorrarOriginal.length > 0) {
+                    for (let rem of idsParaBorrarOriginal) {
+                        await _supabase
                             .from('invitados')
                             .delete()
-                            .eq('titular_dni', rem.dni)
-                            .eq('numero_acompanante', rem.slot)
-                    );
+                            .eq('titular_dni', rem.dniAEliminar)
+                            .eq('numero_acompanante', rem.slotAEliminar);
+                    }
                 }
 
-                const resultados = await Promise.all(operaciones);
-                
-                for (let res of resultados) {
-                    if (res.error) throw res.error;
+                // SEGUNDO: Subimos el lote de upserts con los nuevos dueños o actualizaciones de campos
+                if (listaParaUpsert.length > 0) {
+                    const { error } = await _supabase
+                        .from('invitados')
+                        .upsert(listaParaUpsert, { onConflict: 'titular_dni,numero_acompanante' });
+                    if (error) throw error;
                 }
 
                 Swal.fire({
