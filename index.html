@@ -36,7 +36,7 @@
             <div class="bg-indigo-50 p-4 rounded-xl border border-indigo-100">
                 <span class="text-xs uppercase font-bold text-indigo-500 tracking-wider">Titular Autorizado</span>
                 <h2 id="nombre-titular" class="text-xl font-bold text-gray-800">Cargando...</h2>
-                <p class="text-xs text-gray-500 mt-1">Gestiona tus acompañantes asignados. Puedes rellenar tus pases base o solicitar una excepción si fuera necesario.</p>
+                <p class="text-xs text-gray-500 mt-1">Gestiona tus acompañantes asignados por orden de prioridad. Puedes solicitar una excepción si fuera necesario.</p>
             </div>
 
             <form id="form-invitados" onsubmit="guardarDatos(event)" class="space-y-6">
@@ -112,6 +112,22 @@
             return letraIntroducida === letraCorrecta;
         }
 
+        // CALCULA LA EDAD EXACTA COMPARANDO CON LA FECHA ACTUAL (AÑO EN CURSO: 2026)
+        function calcularEdadExacta(fechaNacimientoStr) {
+            if (!fechaNacimientoStr) return null;
+            const nacimiento = new Date(fechaNacimientoStr);
+            const hoy = new Date();
+            
+            let edad = hoy.getFullYear() - nacimiento.getFullYear();
+            const mesDiff = hoy.getMonth() - nacimiento.getMonth();
+            const diaDiff = hoy.getDate() - nacimiento.getDate();
+            
+            if (mesDiff < 0 || (mesDiff === 0 && diaDiff < 0)) {
+                edad--;
+            }
+            return edad;
+        }
+
         async function verificarAcceso() {
             const inputDni = document.getElementById('login-dni').value.trim().toUpperCase();
             
@@ -174,16 +190,15 @@
                 const algunDiscapacitado = existentes.some(inv => inv.zona_discapacidad === true);
                 document.getElementById('check-discapacidad').checked = algunDiscapacitado;
 
-                // Pintamos lo que ya hay en la base de datos respetando si es base o excepción
                 existentes.forEach(inv => {
                     crearTarjetaEnPantalla(inv.es_excepcion, inv, inv.numero_acompanante);
                 });
             } else {
-                // Si entra de cero por primera vez, le pintamos obligatoriamente sus 2 pases base y fijamos el contador
                 crearTarjetaEnPantalla(false, null, 1);
                 crearTarjetaEnPantalla(false, null, 2);
                 maxAcompanantesHistoricos = 2;
             }
+            reordenarTitulosVisuales();
         }
 
         function crearTarjetaEnPantalla(esExcepcion, datos = null, numeroFijo = null) {
@@ -199,15 +214,15 @@
             card.dataset.esExcepcion = esExcepcion;
             card.dataset.numeroAcompanante = numeroFijo;
 
-            // Solo los casos excepcionales se pueden eliminar de la pantalla
             const botonEliminar = esExcepcion 
                 ? `<button type="button" onclick="marcarComoEliminado(this)" class="text-red-500 font-bold text-xs bg-red-50 px-2 py-1 rounded-lg border border-red-200">Eliminar</button>`
                 : '';
 
+            // NUEVO CAMPO: Input tipo DATE para la fecha de nacimiento
             card.innerHTML = `
                 <div class="flex justify-between items-center border-b pb-2 mb-2 ${esExcepcion ? 'border-amber-200' : 'border-gray-200'}">
-                    <span class="text-xs uppercase font-extrabold tracking-wider ${esExcepcion ? 'text-amber-700' : 'text-gray-500'}">
-                        ${esExcepcion ? '⚠️ Caso Excepcional' : `Acompañante Asignado (Base)`}
+                    <span class="titulo-tarjeta-prioridad text-xs uppercase font-extrabold tracking-wider ${esExcepcion ? 'text-amber-700' : 'text-gray-500'}">
+                        Acompañante --
                     </span>
                     ${botonEliminar}
                 </div>
@@ -215,6 +230,12 @@
                     <input type="text" placeholder="Nombre completo" class="inv-nombre w-full p-3 text-sm border rounded-lg focus:outline-none" value="${datos ? datos.nombre : ''}">
                     <input type="text" placeholder="Apellidos" class="inv-apellidos w-full p-3 text-sm border rounded-lg focus:outline-none" value="${datos ? datos.apellidos : ''}">
                     <input type="text" placeholder="DNI / NIE del acompañante" class="inv-dni w-full p-3 text-sm border rounded-lg uppercase focus:outline-none" value="${datos ? (datos.dni || '') : ''}">
+                    
+                    <div>
+                        <label class="block text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-1 ml-1">Fecha de Nacimiento</label>
+                        <input type="date" class="inv-fecha-nacimiento w-full p-3 text-sm border rounded-lg bg-white focus:outline-none text-gray-700" value="${datos ? datos.fecha_nacimiento : ''}">
+                    </div>
+
                     <select class="inv-parentesco w-full p-3 text-sm border rounded-lg bg-white focus:outline-none">
                         <option value="" disabled ${!datos ? 'selected' : ''}>Selecciona parentesco</option>
                         <option value="Pareja" ${datos && datos.parentesco === 'Pareja' ? 'selected' : ''}>Pareja</option>
@@ -227,11 +248,24 @@
                 ${esExcepcion ? `<div class="mt-2"><textarea placeholder="Justificación breve..." class="inv-motivo w-full p-3 text-xs border border-amber-300 rounded-lg focus:outline-none" rows="2">${datos ? (datos.motivo_excepcion || '') : ''}</textarea></div>` : ''}
             `;
             container.appendChild(card);
+            reordenarTitulosVisuales();
         }
 
         function marcarComoEliminado(btn) {
             const card = btn.closest('.tarjeta-dinamica');
             card.classList.add('hidden', 'para-borrar');
+            reordenarTitulosVisuales();
+        }
+
+        // REORDENA DINÁMICAMENTE LOS TÍTULOS (Acompañante 1, Acompañante 2, Acompañante 3...) EXCLUYENDO LOS BORRADOS
+        function reordenarTitulosVisuales() {
+            const tarjetas = document.querySelectorAll('.tarjeta-dinamica:not(.para-borrar)');
+            tarjetas.forEach((card, index) => {
+                const tituloSpan = card.querySelector('.titulo-tarjeta-prioridad');
+                if (tituloSpan) {
+                    tituloSpan.innerText = `Acompañante ${index + 1}`;
+                }
+            });
         }
 
         async function guardarDatos(event) {
@@ -263,7 +297,9 @@
                         parentesco: "Otros",
                         es_excepcion: esExcepcion,
                         motivo_excepcion: null,
-                        zona_discapacidad: false
+                        zona_discapacidad: false,
+                        fecha_nacimiento: null,
+                        edad_actual: null
                     });
                     continue;
                 }
@@ -272,29 +308,39 @@
                 const nombre = card.querySelector('.inv-nombre').value.trim();
                 const apellidos = card.querySelector('.inv-apellidos').value.trim();
                 const dni = card.querySelector('.inv-dni').value.trim().toUpperCase();
+                const fechaNac = card.querySelector('.inv-fecha-nacimiento').value;
                 const parentesco = card.querySelector('.inv-parentesco').value;
                 const motivo = esExcepcion ? card.querySelector('.inv-motivo').value.trim() : null;
 
-                if (nombre || apellidos || dni || parentesco) {
+                if (nombre || apellidos || dni || fechaNac || parentesco) {
                     if (!nombre || !apellidos) {
-                        Swal.fire('Atención', `Por favor, completa el nombre y apellidos del acompañante Nº ${indexVisual}.`, 'warning');
+                        Swal.fire('Atención', `Por favor, completa el nombre y apellidos del Acompañante ${indexVisual}.`, 'warning');
                         return;
                     }
                     
                     if (!dni) {
-                        Swal.fire('DNI Obligatorio', `El DNI del acompañante Nº ${indexVisual} (${nombre}) es obligatorio.`, 'warning');
+                        Swal.fire('DNI Obligatorio', `El DNI del Acompañante ${indexVisual} (${nombre}) es obligatorio.`, 'warning');
                         return;
                     }
                     
                     if (!validarDniNie(dni)) {
                         Swal.fire({
-                            title: 'DNI de Acompañante Incorrecto',
-                            text: `La letra o formato del DNI introducido para el acompañante Nº ${indexVisual} (${nombre}) no es válido. Por favor, corrígelo.`,
+                            title: 'DNI Incorrecto',
+                            text: `La letra o formato del DNI introducido para el Acompañante ${indexVisual} (${nombre}) no es válido.`,
                             icon: 'error',
                             confirmButtonColor: '#ef4444'
                         });
                         return;
                     }
+
+                    // VALIDACIÓN OBLIGATORIA DE LA FECHA DE NACIMIENTO
+                    if (!fechaNac) {
+                        Swal.fire('Fecha Obligatoria', `Por favor, introduce la fecha de nacimiento del Acompañante ${indexVisual} (${nombre}).`, 'warning');
+                        return;
+                    }
+
+                    // CALCULO DE EDAD ACTUAL EN TIEMPO REAL
+                    const edadCalculada = calcularEdadExacta(fechaNac);
 
                     if (!parentesco) {
                         Swal.fire('Atención', `Por favor, selecciona el parentesco para ${nombre}.`, 'warning');
@@ -314,7 +360,9 @@
                         parentesco: parentesco,
                         es_excepcion: esExcepcion,
                         motivo_excepcion: motivo,
-                        zona_discapacidad: requiereZonaAdaptada 
+                        zona_discapacidad: requiereZonaAdaptada,
+                        fecha_nacimiento: fechaNac,
+                        edad_actual: edadCalculada // Guardamos el número exacto de años
                     });
                 }
             }
