@@ -17,6 +17,7 @@
             <p class="text-indigo-200 text-sm mt-1">Confirmación y Gestión de Invitados</p>
         </header>
 
+        <!-- PANTALLA 1: LOGIN -->
         <div id="pantalla-login" class="p-6 flex-grow flex flex-col justify-center items-center">
             <div class="w-full space-y-4">
                 <div class="text-center mb-6">
@@ -32,19 +33,29 @@
             </div>
         </div>
 
+        <!-- PANTALLA 2: FORMULARIO -->
         <div id="pantalla-formulario" class="p-6 flex-grow hidden space-y-6">
             <div class="bg-indigo-50 p-4 rounded-xl border border-indigo-100">
                 <span class="text-xs uppercase font-bold text-indigo-500 tracking-wider">Titular Autorizado</span>
                 <h2 id="nombre-titular" class="text-xl font-bold text-gray-800">Cargando...</h2>
                 <p class="text-xs text-gray-600 mt-2 font-medium leading-relaxed">
-                    Gestiona tus acompañantes por orden de prioridad. Las invitaciones que cedas quedarán bloqueadas en tu panel.
+                    Gestiona tus acompañantes por orden de prioridad. Las invitaciones que cedas quedarán bloqueadas. Puedes solicitar pases excepcionales si fuera necesario.
                 </p>
             </div>
 
             <form id="form-invitados" onsubmit="guardarDatos(event)" class="space-y-6">
                 
+                <!-- CONTENEDOR DE TARJETAS DINÁMICAS (BASE, CEDIDAS Y EXCEPCIONALES) -->
                 <div id="lista-invitados" class="space-y-4"></div>
 
+                <!-- BOTONERA PARA AÑADIR INVITACIONES EXCEPCIONALES -->
+                <div class="flex justify-center">
+                    <button type="button" onclick="crearTarjetaExcepcionalVacia()" class="w-full border-2 border-dashed border-amber-400 text-amber-800 bg-amber-50 font-bold p-3 rounded-xl flex items-center justify-center gap-2 hover:bg-amber-100 transition-colors text-sm shadow-sm">
+                        <span>➕ Solicitar Caso Excepcional</span>
+                    </button>
+                </div>
+
+                <!-- CASILLA: ZONA HABILITADA DISCAPACIDAD -->
                 <div class="bg-blue-50 p-4 rounded-xl border border-blue-200 mt-4">
                     <div class="flex items-start">
                         <div class="flex items-center h-5">
@@ -59,6 +70,7 @@
                     </div>
                 </div>
 
+                <!-- CASILLA LEGAL LOPD -->
                 <div class="bg-gray-50 p-4 rounded-xl border border-gray-200">
                     <div class="flex items-start">
                         <div class="flex items-center h-5">
@@ -89,6 +101,7 @@
         const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
         let usuarioDni = "";
+        let maxRanuraExcepcionales = 1000; // Indice interno de control para las nuevas ranuras de casos excepcionales
 
         function validarDniNie(documento) {
             const regex = /^[XYZ\d]\d{7}[A-Z]$/i;
@@ -173,7 +186,6 @@
             const container = document.getElementById('lista-invitados');
             container.innerHTML = "";
 
-            // Buscamos tus invitaciones propias y las que te hayan cedido a ti
             const { data: existentes } = await _supabase
                 .from('invitados')
                 .select('*')
@@ -182,56 +194,79 @@
 
             const mapaPropios = {};
             const recibidosExtras = [];
+            const excepcionalesGuardadas = [];
 
             if (existentes && existentes.length > 0) {
                 const algunDiscapacitado = existentes.some(inv => inv.zona_discapacidad === true);
                 document.getElementById('check-discapacidad').checked = algunDiscapacitado;
 
                 existentes.forEach(inv => {
-                    // Si tú eres el titular_dni y la ranura es de las 3 base
                     if (inv.titular_dni === usuarioDni && inv.numero_acompanante <= 3) {
                         mapaPropios[inv.numero_acompanante] = inv;
                     } 
-                    // Si el titular_dni es tu DNI pero el número de acompañante es > 100, es porque ALGUIEN MÁS te la cedió a ti
-                    else if (inv.titular_dni === usuarioDni && inv.numero_acompanante > 100) {
+                    else if (inv.titular_dni === usuarioDni && inv.numero_acompanante > 100 && inv.numero_acompanante < 1000) {
                         recibidosExtras.push(inv);
+                    }
+                    else if (inv.titular_dni === usuarioDni && inv.numero_acompanante >= 1000) {
+                        excepcionalesGuardadas.push(inv);
+                        if (inv.numero_acompanante > maxRanuraExcepcionales) {
+                            maxRanuraExcepcionales = inv.numero_acompanante;
+                        }
                     }
                 });
             }
 
-            // Pintamos de forma estricta los 3 pases reglamentarios
+            // 1. Pintamos de forma estricta los 3 pases reglamentarios
             for (let i = 1; i <= 3; i++) {
                 const datosInvitado = mapaPropios[i] || null;
-                crearTarjetaEnPantalla(false, datosInvitado, i, false);
+                crearTarjetaEnPantalla(false, datosInvitado, i, "propia");
             }
 
-            // Pintamos las tarjetas extras extras que hayamos RECIBIDO (en las que somos dueños finales)
+            // 2. Pintamos las tarjetas extras recibidas de otros compañeros
             recibidosExtras.forEach(invCedido => {
-                crearTarjetaEnPantalla(false, invCedido, invCedido.numero_acompanante, true);
+                crearTarjetaEnPantalla(false, invCedido, invCedido.numero_acompanante, "recibida");
+            });
+
+            // 3. Pintamos los casos excepcionales que ya estaban registrados en la BD
+            excepcionalesGuardadas.forEach(invExcep => {
+                crearTarjetaEnPantalla(true, invExcep, invExcep.numero_acompanante, "excepcional");
             });
 
             reordenarTitulosVisuales();
         }
 
-        function crearTarjetaEnPantalla(esExcepcion, datos = null, numeroFijo = null, esRecibida = false) {
+        function crearTarjetaExcepcionalVacia() {
+            maxRanuraExcepcionales++;
+            crearTarjetaEnPantalla(true, null, maxRanuraExcepcionales, "excepcional");
+        }
+
+        function crearTarjetaEnPantalla(esExcepcion, datos = null, numeroFijo = null, tipoTarjeta = "propia") {
             const container = document.getElementById('lista-invitados');
             const card = document.createElement('div');
             
-            // Si la tarjeta está cedida hacia afuera, le metemos una estética gris de bloqueo total
-            const yaCedidaHaciaAfuera = !esRecibida && datos && datos.cedido_por_dni && datos.cedido_por_dni !== "" && datos.dni === "CEDIDO";
+            const yaCedidaHaciaAfuera = tipoTarjeta === "propia" && datos && datos.cedido_por_dni && datos.cedido_por_dni !== "" && datos.dni === "CEDIDO";
 
-            card.className = `p-4 rounded-xl border-2 shadow-sm relative space-y-3 tarjeta-dinamica ${
-                esRecibida ? 'border-emerald-300 bg-emerald-50/50' : 
-                (yaCedidaHaciaAfuera ? 'border-gray-300 bg-gray-200/40 opacity-75' : 'border-gray-200 bg-gray-50/50')
-            }`;
+            // Asignación de estilos css originales según el tipo
+            if (tipoTarjeta === "excepcional") {
+                card.className = "p-4 rounded-xl border-2 shadow-sm relative space-y-3 tarjeta-dinamica border-amber-300 bg-amber-50/50";
+            } else if (tipoTarjeta === "recibida") {
+                card.className = "p-4 rounded-xl border-2 shadow-sm relative space-y-3 tarjeta-dinamica border-emerald-300 bg-emerald-50/50";
+            } else {
+                card.className = `p-4 rounded-xl border-2 shadow-sm relative space-y-3 tarjeta-dinamica ${yaCedidaHaciaAfuera ? 'border-gray-300 bg-gray-200/40 opacity-75' : 'border-gray-200 bg-gray-50/50'}`;
+            }
+
             card.dataset.numeroAcompanante = numeroFijo;
-            card.dataset.esRecibida = esRecibida;
+            card.dataset.tipoTarjeta = tipoTarjeta;
             card.dataset.estaBloqueada = yaCedidaHaciaAfuera;
 
+            // Bloque superior/Botonera según el caso
             let bloqueCeder = '';
-            if (!esRecibida) {
+            let botonEliminar = '';
+
+            if (tipoTarjeta === "excepcional") {
+                botonEliminar = `<button type="button" onclick="eliminarTarjetaExcepcional(this)" class="text-red-500 font-bold text-xs bg-red-50 px-2 py-1 rounded-lg border border-red-200 hover:bg-red-100 transition-colors">Eliminar</button>`;
+            } else if (tipoTarjeta === "propia") {
                 if (yaCedidaHaciaAfuera) {
-                    // Mensaje de bloqueo en lugar de los inputs editables
                     bloqueCeder = `
                         <div class="bg-amber-100/70 p-3 rounded-lg border border-amber-200 text-xs font-bold text-amber-900 flex flex-col gap-1">
                             <span>🔒 Pase Bloqueado</span>
@@ -239,7 +274,6 @@
                         </div>
                     `;
                 } else {
-                    // Checkbox normal para ceder pase activo
                     bloqueCeder = `
                         <div class="bg-indigo-50/50 p-2 rounded-lg border border-indigo-100 flex flex-col gap-2 mt-1">
                             <label class="flex items-center gap-2 text-xs font-bold text-indigo-900 cursor-pointer select-none">
@@ -255,31 +289,34 @@
                 }
             }
 
-            const badgeCabecera = esRecibida 
+            const badgeCabecera = tipoTarjeta === "recibida" 
                 ? `<span class="text-[10px] bg-emerald-200 text-emerald-800 font-bold px-2 py-0.5 rounded-lg">Recibida de: ${datos?.cedido_por_dni || ''}</span>`
-                : '';
+                : (tipoTarjeta === "excepcional" ? `<span class="text-[10px] bg-amber-200 text-amber-800 font-bold px-2 py-0.5 rounded-lg">Pase Excepcional</span>` : '');
 
             card.innerHTML = `
-                <div class="flex justify-between items-center border-b pb-2 mb-2 ${esRecibida ? 'border-emerald-200' : 'border-gray-200'}">
-                    <span class="titulo-tarjeta-prioridad text-xs uppercase font-extrabold tracking-wider ${esRecibida ? 'text-emerald-700' : 'text-gray-500'}">
-                        Acompañante --
+                <div class="flex justify-between items-center border-b pb-2 mb-2 ${tipoTarjeta === 'recibida' ? 'border-emerald-200' : (tipoTarjeta === 'excepcional' ? 'border-amber-200' : 'border-gray-200')}">
+                    <span class="titulo-tarjeta-prioridad text-xs uppercase font-extrabold tracking-wider ${tipoTarjeta === 'recibida' ? 'text-emerald-700' : (tipoTarjeta === 'excepcional' ? 'text-amber-700' : 'text-gray-500')}">
+                        Cargando...
                     </span>
-                    ${badgeCabecera}
+                    <div class="flex items-center gap-2">
+                        ${badgeCabecera}
+                        ${botonEliminar}
+                    </div>
                 </div>
                 
                 ${bloqueCeder}
 
                 <div class="capa-datos-familiares grid grid-cols-1 gap-2 ${yaCedidaHaciaAfuera ? 'hidden' : ''}">
-                    <input type="text" placeholder="Nombre completo" class="inv-nombre w-full p-3 text-sm border rounded-lg focus:outline-none" value="${datos ? (datos.nombre || '') : ''}" ${yaCedidaHaciaAfuera ? 'disabled' : ''}>
-                    <input type="text" placeholder="Apellidos" class="inv-apellidos w-full p-3 text-sm border rounded-lg focus:outline-none" value="${datos ? (datos.apellidos || '') : ''}" ${yaCedidaHaciaAfuera ? 'disabled' : ''}>
-                    <input type="text" placeholder="DNI / NIE del acompañante" class="inv-dni w-full p-3 text-sm border rounded-lg uppercase focus:outline-none" value="${datos && datos.dni !== 'CEDIDO' ? (datos.dni || '') : ''}" ${yaCedidaHaciaAfuera ? 'disabled' : ''}>
+                    <input type="text" placeholder="Nombre completo" class="inv-nombre w-full p-3 text-sm border rounded-lg focus:outline-none" value="${datos ? (datos.nombre || '') : ''}">
+                    <input type="text" placeholder="Apellidos" class="inv-apellidos w-full p-3 text-sm border rounded-lg focus:outline-none" value="${datos ? (datos.apellidos || '') : ''}">
+                    <input type="text" placeholder="DNI / NIE del acompañante" class="inv-dni w-full p-3 text-sm border rounded-lg uppercase focus:outline-none" value="${datos && datos.dni !== 'CEDIDO' ? (datos.dni || '') : ''}">
                     
                     <div>
                         <label class="block text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-1 ml-1">Fecha de Nacimiento</label>
-                        <input type="date" class="inv-fecha-nacimiento w-full p-3 text-sm border rounded-lg bg-white focus:outline-none text-gray-700" value="${datos ? (datos.fecha_nacimiento || '') : ''}" ${yaCedidaHaciaAfuera ? 'disabled' : ''}>
+                        <input type="date" class="inv-fecha-nacimiento w-full p-3 text-sm border rounded-lg bg-white focus:outline-none text-gray-700" value="${datos ? (datos.fecha_nacimiento || '') : ''}">
                     </div>
 
-                    <select class="inv-parentesco w-full p-3 text-sm border rounded-lg bg-white focus:outline-none" ${yaCedidaHaciaAfuera ? 'disabled' : ''}>
+                    <select class="inv-parentesco w-full p-3 text-sm border rounded-lg bg-white focus:outline-none">
                         <option value="" disabled ${!datos ? 'selected' : ''}>Selecciona parentesco</option>
                         <option value="Pareja" ${datos && datos.parentesco === 'Pareja' ? 'selected' : ''}>Pareja</option>
                         <option value="Hijo/a" ${datos && datos.parentesco === 'Hijo/a' ? 'selected' : ''}>Hijo/a</option>
@@ -287,10 +324,17 @@
                         <option value="Hermano/a" ${datos && datos.parentesco === 'Hermano/a' ? 'selected' : ''}>Hermano/a</option>
                         <option value="Otros" ${datos && datos.parentesco === 'Otros' ? 'selected' : ''}>Otro</option>
                     </select>
+
+                    ${tipoTarjeta === "excepcional" ? `
+                        <div class="mt-1">
+                            <label class="block text-[11px] font-bold text-amber-800 uppercase tracking-wider mb-1 ml-1">Justificación del Caso Excepcional</label>
+                            <textarea placeholder="Ej: Hermano menor de edad a cargo, etc..." class="inv-motivo w-full p-3 text-xs border border-amber-300 rounded-lg bg-white focus:outline-none" rows="2">${datos ? (datos.motivo_excepcion || '') : ''}</textarea>
+                        </div>
+                    ` : ''}
                 </div>
             `;
             container.appendChild(card);
-            reordenarTitulosVisuales();
+            reordenarTitulesVisuales();
         }
 
         function conmutarCesion(check) {
@@ -307,15 +351,33 @@
             }
         }
 
+        function eliminarTarjetaExcepcional(btn) {
+            const card = btn.closest('.tarjeta-dinamica');
+            // Si ya existía en la base de datos de Supabase, la marcamos visualmente para borrarla físicamente al guardar
+            card.classList.add('hidden', 'para-borrar-excepcion');
+            reordenarTitulosVisuales();
+        }
+
         function reordenarTitulosVisuales() {
-            const tarjetas = document.querySelectorAll('.tarjeta-dinamica');
-            tarjetas.forEach((card, index) => {
+            const tarjetasVisibles = document.querySelectorAll('.tarjeta-dinamica:not(.para-borrar-excepcion)');
+            let contadorPropio = 1;
+            let contadorExtra = 1;
+            let contadorExcepcional = 1;
+
+            tarjetasVisibles.forEach((card) => {
                 const tituloSpan = card.querySelector('.titulo-tarjeta-prioridad');
+                const tipo = card.dataset.tipoTarjeta;
+
                 if (tituloSpan) {
-                    if (card.dataset.esRecibida === "true") {
-                        tituloSpan.innerText = `Pase Extra ${index + 1}`;
-                    } else {
-                        tituloSpan.innerText = `Acompañante ${index + 1}`;
+                    if (tipo === "propia") {
+                        tituloSpan.innerText = `Acompañante ${contadorPropio}`;
+                        contadorPropio++;
+                    } else if (tipo === "recibida") {
+                        tituloSpan.innerText = `Pase Extra ${contadorExtra}`;
+                        contadorExtra++;
+                    } else if (tipo === "excepcional") {
+                        tituloSpan.innerText = `Caso Excepcional ${contadorExcepcional}`;
+                        contadorExcepcional++;
                     }
                 }
             });
@@ -331,23 +393,28 @@
             }
 
             const requiereZonaAdaptada = document.getElementById('check-discapacidad').checked;
-            const tarjetas = document.getElementsByClassName('tarjeta-dinamica');
+            const tarjetas = document.querySelectorAll('.tarjeta-dinamica');
             const listaParaUpsert = [];
+            const idsExcepcionalesParaBorrar = [];
 
             let indexVisual = 0;
 
             for (let card of tarjetas) {
-                indexVisual++;
                 const numPosicion = parseInt(card.dataset.numeroAcompanante);
-                const esRecibida = card.dataset.esRecibida === "true";
+                const tipoTarjeta = card.dataset.tipoTarjeta;
                 const estaBloqueada = card.dataset.estaBloqueada === "true";
 
-                // Si la tarjeta ya estaba guardada como bloqueada desde antes, la dejamos exactamente igual
-                if (estaBloqueada) {
+                // Si se marcó para eliminar un caso excepcional existente, guardamos la referencia de borrado
+                if (card.classList.contains('para-borrar-excepcion')) {
+                    idsExcepcionalesParaBorrar.push(numPosicion);
                     continue;
                 }
 
-                if (!esRecibida) {
+                if (estaBloqueada) continue;
+
+                indexVisual++;
+
+                if (tipoTarjeta === "propia") {
                     const checkCeder = card.querySelector('.check-ceder-entrada');
                     const esCedida = checkCeder && checkCeder.checked;
 
@@ -355,53 +422,40 @@
                         const dniBeneficiario = card.querySelector('.inv-cedido-dni').value.trim().toUpperCase();
                         
                         if (!dniBeneficiario) {
-                            Swal.fire('Falta DNI', `Has marcado ceder la invitación en el Acompañante ${indexVisual}, por favor pon el DNI de tu compañero.`, 'warning');
+                            Swal.fire('Falta DNI', `Indica el DNI de tu compañero en el Acompañante ${indexVisual}.`, 'warning');
                             return;
                         }
                         if (!validarDniNie(dniBeneficiario)) {
-                            Swal.fire('DNI Incorrecto', `El DNI del compañero al que le cedes el Acompañante ${indexVisual} no es válido.`, 'error');
+                            Swal.fire('DNI Incorrecto', `El DNI del compañero en el Acompañante ${indexVisual} no es válido.`, 'error');
                             return;
                         }
                         if (dniBeneficiario === usuarioDni) {
-                            Swal.fire('Error', `No puedes cederte una entrada a ti mismo.`, 'warning');
+                            Swal.fire('Atención', `No puedes cederte una entrada a ti mismo.`, 'warning');
                             return;
                         }
 
-                        // INYECCIÓN 1: Dejamos la tarjeta en tu cuenta (ranura 1, 2 o 3) pero congelada
+                        // Registro 1: Bloqueo en tu cuenta
                         listaParaUpsert.push({
                             titular_dni: usuarioDni, 
                             numero_acompanante: numPosicion,     
-                            nombre: "", 
-                            apellidos: "",
-                            dni: "CEDIDO", // Gatillo para activar el bloqueo visual al recargar
-                            parentesco: "Otros",
-                            es_excepcion: false,
-                            motivo_excepcion: null,
-                            zona_discapacidad: requiereZonaAdaptada,
-                            fecha_nacimiento: null, 
-                            edad_actual: null,
-                            cedido_por_dni: dniBeneficiario // Guardamos a quién se la diste
+                            nombre: "", apellidos: "", dni: "CEDIDO", parentesco: "Otros",
+                            es_excepcion: false, motivo_excepcion: null,
+                            zona_discapacidad: requiereZonaAdaptada, fecha_nacimiento: null, edad_actual: null,
+                            cedido_por_dni: dniBeneficiario
                         });
 
-                        // INYECCIÓN 2: Le creamos la copia correspondiente en la cuenta del compañero en ranura alta (>100)
-                        const ranuraCompanero = 100 + numPosicion;
+                        // Registro 2: Copia en el panel del compañero (ranura >100)
                         listaParaUpsert.push({
                             titular_dni: dniBeneficiario, 
-                            numero_acompanante: ranuraCompanero,     
-                            nombre: "", 
-                            apellidos: "",
-                            dni: null,
-                            parentesco: "Otros",
-                            es_excepcion: false,
-                            motivo_excepcion: null,
-                            zona_discapacidad: requiereZonaAdaptada,
-                            fecha_nacimiento: null, 
-                            edad_actual: null,
-                            cedido_por_dni: usuarioDni // El compañero sabe que viene de ti
+                            numero_acompanante: 100 + numPosicion,     
+                            nombre: "", apellidos: "", dni: null, parentesco: "Otros",
+                            es_excepcion: false, motivo_excepcion: null,
+                            zona_discapacidad: requiereZonaAdaptada, fecha_nacimiento: null, edad_actual: null,
+                            cedido_por_dni: usuarioDni
                         });
 
                     } else {
-                        // Flujo regular de tus tarjetas normales editables
+                        // Flujo normal de tus acompañantes base
                         const nombre = card.querySelector('.inv-nombre').value.trim();
                         const apellidos = card.querySelector('.inv-apellidos').value.trim();
                         const dni = card.querySelector('.inv-dni').value.trim().toUpperCase();
@@ -409,24 +463,12 @@
                         const parentesco = card.querySelector('.inv-parentesco').value;
 
                         if (nombre || apellidos || dni || fechaNac || parentesco) {
-                            if (!nombre || !apellidos) {
-                                Swal.fire('Atención', `Completa el nombre y apellidos del Acompañante ${indexVisual}.`, 'warning');
-                                return;
-                            }
-                            if (!dni) {
-                                Swal.fire('DNI Obligatorio', `El DNI del Acompañante ${indexVisual} es obligatorio.`, 'warning');
+                            if (!nombre || !apellidos || !dni || !fechaNac || !parentesco) {
+                                Swal.fire('Atención', `Por favor, completa los datos del Acompañante ${indexVisual}.`, 'warning');
                                 return;
                             }
                             if (!validarDniNie(dni)) {
-                                Swal.fire('DNI Incorrecto', `DNI no válido en el Acompañante ${indexVisual}.`, 'error');
-                                return;
-                            }
-                            if (!fechaNac) {
-                                Swal.fire('Fecha Obligatoria', `Introduce la fecha de nacimiento del Acompañante ${indexVisual}.`, 'warning');
-                                return;
-                            }
-                            if (!parentesco) {
-                                Swal.fire('Atención', `Selecciona el parentesco para el Acompañante ${indexVisual}.`, 'warning');
+                                Swal.fire('DNI Incorrecto', `El DNI del Acompañante ${indexVisual} no es válido.`, 'error');
                                 return;
                             }
 
@@ -435,60 +477,61 @@
                             listaParaUpsert.push({
                                 titular_dni: usuarioDni,
                                 numero_acompanante: numPosicion,
-                                nombre: nombre,
-                                apellidos: apellidos,
-                                dni: dni,
-                                parentesco: parentesco,
-                                es_excepcion: false,
-                                motivo_excepcion: null,
-                                zona_discapacidad: requiereZonaAdaptada,
-                                fecha_nacimiento: fechaNac,
-                                edad_actual: edadCalculada,
+                                nombre: nombre, apellidos: apellidos, dni: dni, parentesco: parentesco,
+                                es_excepcion: false, motivo_excepcion: null,
+                                zona_discapacidad: requiereZonaAdaptada, fecha_nacimiento: fechaNac, edad_actual: edadCalculada,
                                 cedido_por_dni: null
                             });
                         } else {
+                            // Limpiar si el usuario deja la tarjeta en blanco
                             listaParaUpsert.push({
-                                titular_dni: usuarioDni,
-                                numero_acompanante: numPosicion,
+                                titular_dni: usuarioDni, numero_acompanante: numPosicion,
                                 nombre: null, apellidos: null, dni: null, parentesco: "Otros",
                                 es_excepcion: false, motivo_excepcion: null, zona_discapacidad: requiereZonaAdaptada,
                                 fecha_nacimiento: null, edad_actual: null, cedido_por_dni: null
                             });
                         }
                     }
-                } else if (esRecibida) {
-                    // Flujo para actualizar los datos familiares de las tarjetas que te han cedido a ti
+                } 
+                else if (tipoTarjeta === "recibida" || tipoTarjeta === "excepcional") {
                     const nombre = card.querySelector('.inv-nombre').value.trim();
                     const apellidos = card.querySelector('.inv-apellidos').value.trim();
                     const dni = card.querySelector('.inv-dni').value.trim().toUpperCase();
                     const fechaNac = card.querySelector('.inv-fecha-nacimiento').value;
                     const parentesco = card.querySelector('.inv-parentesco').value;
+                    const motivo = tipoTarjeta === "excepcional" ? card.querySelector('.inv-motivo').value.trim() : null;
 
-                    if (nombre || apellidos || dni || fechaNac || parentesco) {
+                    if (nombre || apellidos || dni || fechaNac || parentesco || motivo) {
                         if (!nombre || !apellidos || !dni || !fechaNac || !parentesco) {
-                            Swal.fire('Atención', `Por favor completa todos los campos de tu Pase Extra ${indexVisual}.`, 'warning');
+                            Swal.fire('Atención', `Completa todos los campos obligatorios del panel.`, 'warning');
                             return;
                         }
                         if (!validarDniNie(dni)) {
-                            Swal.fire('DNI Incorrecto', `El DNI del Pase Extra ${indexVisual} no es válido.`, 'error');
+                            Swal.fire('DNI Incorrecto', `El DNI introducido no tiene un formato válido.`, 'error');
+                            return;
+                        }
+                        if (tipoTarjeta === "excepcional" && !motivo) {
+                            Swal.fire('Justificación Obligatoria', `Por favor justifica el motivo del caso excepcional.`, 'warning');
                             return;
                         }
 
                         const edadCalculada = calcularEdadExacta(fechaNac);
 
+                        // Si es recibida mantenemos su remitente
+                        let remitente = null;
+                        if (tipoTarjeta === "recibida") {
+                            const badgeText = card.querySelector('.titulo-tarjeta-prioridad').nextElementSibling.innerText;
+                            remitente = badgeText.replace('Recibida de: ', '');
+                        }
+
                         listaParaUpsert.push({
                             titular_dni: usuarioDni,
                             numero_acompanante: numPosicion,
-                            nombre: nombre,
-                            apellidos: apellidos,
-                            dni: dni,
-                            parentesco: parentesco,
-                            es_excepcion: false,
-                            motivo_excepcion: null,
-                            zona_discapacidad: requiereZonaAdaptada,
-                            fecha_nacimiento: fechaNac,
-                            edad_actual: edadCalculada,
-                            cedido_por_dni: card.querySelector('.titulo-tarjeta-prioridad').nextElementSibling.innerText.replace('Recibida de: ', '')
+                            nombre: nombre, apellidos: apellidos, dni: dni, parentesco: parentesco,
+                            es_excepcion: (tipoTarjeta === "excepcional"), 
+                            motivo_excepcion: motivo,
+                            zona_discapacidad: requiereZonaAdaptada, fecha_nacimiento: fechaNac, edad_actual: edadCalculada,
+                            cedido_por_dni: remitente
                         });
                     }
                 }
@@ -497,6 +540,18 @@
             Swal.fire({ title: 'Guardando cambios...', didOpen: () => Swal.showLoading(), allowOutsideClick: false });
 
             try {
+                // 1. Borramos físicamente de Supabase las tarjetas excepcionales eliminadas
+                if (idsExcepcionalesParaBorrar.length > 0) {
+                    for (let slotBorrar of idsExcepcionalesParaBorrar) {
+                        await _supabase
+                            .from('invitados')
+                            .delete()
+                            .eq('titular_dni', usuarioDni)
+                            .eq('numero_acompanante', slotBorrar);
+                    }
+                }
+
+                // 2. Ejecutamos el guardado de todo el lote (propias, cedidas y excepcionales nuevas/editadas)
                 if (listaParaUpsert.length > 0) {
                     const { error } = await _supabase
                         .from('invitados')
@@ -506,7 +561,7 @@
 
                 Swal.fire({
                     title: '¡Todo guardado!',
-                    text: 'Las invitaciones se han procesado y bloqueado correctamente.',
+                    text: 'Los pases reglamentarios, cesiones y casos excepcionales se han sincronizado con éxito.',
                     icon: 'success',
                     confirmButtonColor: '#4f46e5'
                 }).then(() => {
