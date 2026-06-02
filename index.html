@@ -35,12 +35,12 @@
 
         <!-- PANTALLA 2: FORMULARIO -->
         <div id="pantalla-formulario" class="p-6 flex-grow hidden space-y-6">
-            <!-- CABECERA ACTUALIZADA CON TUS INSTRUCCIONES LOGÍSTICAS EXACTAS -->
+            <!-- CABECERA CORREGIDA Y PULIDA -->
             <div class="bg-indigo-50 p-4 rounded-xl border border-indigo-100">
                 <span class="text-xs uppercase font-bold text-indigo-500 tracking-wider">Titular Autorizado</span>
                 <h2 id="nombre-titular" class="text-xl font-bold text-gray-800">Cargando...</h2>
                 <p class="text-xs text-gray-600 mt-2 font-medium leading-relaxed">
-                    Gestiona tus acompañantes por orden de prioridad. Puedes solicitar invitaciones excepcionales si fuera necesario, ya que pueden ser varias.
+                    Gestiona tus acompañantes por orden de prioridad. Puedes solicitar invitaciones excepcionales si fuera necesario.
                 </p>
             </div>
 
@@ -130,7 +130,7 @@
             const diaDiff = hoy.getDate() - nacimiento.getDate();
             
             if (mesDiff < 0 || (mesDiff === 0 && diaDiff < 0)) {
-                parent.edad--;
+                edad--;
             }
             return edad;
         }
