@@ -17,433 +17,315 @@
             <p class="text-indigo-200 text-sm mt-1">Confirmación y Gestión de Invitados</p>
         </header>
 
-        <!-- PANTALLA 1: LOGIN -->
         <div id="pantalla-login" class="p-6 flex-grow flex flex-col justify-center items-center">
             <div class="w-full space-y-4">
                 <div class="text-center mb-6">
-                    <p class="text-gray-600 font-medium">Introduce tu DNI/NIE para acceder a tus invitaciones</p>
+                    <p class="text-gray-600 font-medium">Introduce tu DNI/NIE para acceder</p>
                 </div>
-                <div>
-                    <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Tu Documento de Identidad</label>
-                    <input type="text" id="login-dni" placeholder="Ej: 12345678Z" class="w-full p-4 border-2 border-gray-300 rounded-xl text-lg font-semibold uppercase focus:border-indigo-500 focus:outline-none">
-                </div>
-                <button onclick="verificarAcceso()" class="w-full bg-indigo-600 text-white font-bold p-4 rounded-xl shadow-md text-lg">
-                    Acceder al Formulario
-                </button>
+                <input type="text" id="login-dni" placeholder="DNI / NIE" class="w-full p-3 border rounded-lg uppercase text-center font-semibold tracking-wider focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                <button onclick="autenticarUsuario()" class="w-full bg-indigo-600 text-white p-3 rounded-lg font-bold hover:bg-indigo-700 transition">Acceder</button>
             </div>
         </div>
 
-        <!-- PANTALLA 2: FORMULARIO -->
-        <div id="pantalla-formulario" class="p-6 flex-grow hidden space-y-6">
-            <div class="bg-indigo-50 p-4 rounded-xl border border-indigo-100">
-                <span class="text-xs uppercase font-bold text-indigo-500 tracking-wider">Titular Autorizado</span>
-                <h2 id="nombre-titular" class="text-xl font-bold text-gray-800">Cargando...</h2>
-                <p class="text-xs text-gray-600 mt-2 font-medium leading-relaxed">
-                    Gestiona tus acompañantes por orden de prioridad. Puedes solicitar invitaciones excepcionales si fuera necesario.
-                </p>
+        <div id="pantalla-formulario" class="hidden p-6 flex-grow flex flex-col justify-between">
+            <div>
+                <div class="bg-indigo-50 p-4 rounded-lg mb-6 border border-indigo-100">
+                    <p class="text-xs text-indigo-500 uppercase tracking-wider font-bold">Titular de la cuenta</p>
+                    <p id="nombre-titular" class="text-lg font-bold text-gray-800">-</p>
+                    <p id="dni-titular" class="text-sm text-gray-500 font-mono">-</p>
+                </div>
+
+                <h2 class="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
+                    <span>Panel de Invitaciones</span>
+                    <span id="contador-pases" class="text-xs bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full font-semibold">3 pases</span>
+                </h2>
+
+                <div id="contenedor-tarjetas" class="space-y-6">
+                    </div>
             </div>
 
-            <form id="form-invitados" onsubmit="guardarDatos(event)" class="space-y-6">
-                <div id="lista-invitados" class="space-y-4"></div>
-
-                <!-- BOTONERA ÚNICA -->
-                <div class="flex justify-center">
-                    <button type="button" onclick="crearTarjetaEnPantalla(true, null)" class="w-full border-2 border-dashed border-amber-400 text-amber-800 bg-amber-50 font-bold p-3 rounded-xl flex items-center justify-center gap-2 hover:bg-amber-100 transition-colors text-sm shadow-sm">
-                        <span>➕ Solicitar Caso Excepcional</span>
-                    </button>
-                </div>
-
-                <!-- CASILLA: ZONA HABILITADA DISCAPACIDAD -->
-                <div class="bg-blue-50 p-4 rounded-xl border border-blue-200 mt-4">
-                    <div class="flex items-start">
-                        <div class="flex items-center h-5">
-                            <input id="check-discapacidad" type="checkbox" class="w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500 cursor-pointer">
-                        </div>
-                        <div class="ml-3 text-xs">
-                            <label for="check-discapacidad" class="font-bold text-blue-950 cursor-pointer select-none">
-                                ¿Algún miembro del grupo requiere acceso a la zona habilitada para personal con discapacidad/movilidad reducida?
-                            </label>
-                            <p class="text-blue-700 text-[11px] mt-0.5">Nota: Si se marca "Sí", se asignará pase a esta zona reservada para todo el grupo familiar.</p>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- CASILLA LEGAL LOPD -->
-                <div class="bg-gray-50 p-4 rounded-xl border border-gray-200">
-                    <div class="flex items-start">
-                        <div class="flex items-center h-5">
-                            <input id="check-lopd" type="checkbox" class="w-5 h-5 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500 cursor-pointer">
-                        </div>
-                        <div class="ml-3 text-xs">
-                            <label for="check-lopd" class="font-medium text-gray-700 cursor-pointer select-none">
-                                Acepto el tratamiento de los datos facilitados exclusivamente para la gestión de confirmaciones, control de accesos y organización del RRDD 26 de conformidad con la LOPDGDD y el RGPD.
-                            </label>
-                        </div>
-                    </div>
-                </div>
-
-                <button type="submit" class="w-full bg-green-600 text-white font-bold p-4 rounded-xl shadow-lg text-lg">
+            <div class="mt-8 border-t pt-4">
+                <button onclick="guardarDatos()" class="w-full bg-emerald-600 text-white p-4 rounded-xl font-bold text-lg shadow-lg hover:bg-emerald-700 transition flex justify-center items-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" /></svg>
                     Guardar y Confirmar Lista
                 </button>
-            </form>
+            </div>
         </div>
 
-        <footer class="p-4 bg-gray-50 text-center border-t border-gray-200">
-            <p class="text-xs text-gray-400 font-medium">© 2026 Organización RRDD 26</p>
+        <footer class="p-4 bg-gray-50 text-center text-xs text-gray-400 border-t">
+            &copy; 2026 Organización RRDD 26
         </footer>
     </div>
 
     <script>
-        const SUPABASE_URL = "https://nebtkwgebbgenmlysnui.supabase.co";
-        const SUPABASE_KEY = "sb_publishable_zCd7omi4D9AK2rAXlTEvmw_UwKYo0d_";
-        const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+        // CONFIGURACIÓN DE SUPABASE
+        const SUPABASE_URL = "https://nebtkwgebbgenmlysnui.supabase.co"; 
+        const SUPABASE_ANON_KEY = "sb_publishable_zCd7omi4D9AK2rAXlTEvmw_UwKYo0d_";
+        const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-        let usuarioDni = "";
-        let maxAcompanantesHistoricos = 0;
+        let usuarioAutenticado = null;
 
-        function validarDniNie(documento) {
-            const regex = /^[XYZ\d]\d{7}[A-Z]$/i;
-            if (!regex.test(documento)) return false;
-
-            let stringDni = documento.toUpperCase();
-            stringDni = stringDni
-                .replace(/^X/, '0')
-                .replace(/^Y/, '1')
-                .replace(/^Z/, '2');
-
-            const numero = parseInt(stringDni.substr(0, 8), 10);
-            const letraIntroducida = stringDni.substr(8, 1);
-            const letrasValidas = "TRWAGMYFPDXBNJZSQVHLCKE";
-            const letraCorrecta = letrasValidas.charAt(numero % 23);
-
-            return letraIntroducida === letraCorrecta;
-        }
-
-        function calcularEdadExacta(fechaNacimientoStr) {
-            if (!fechaNacimientoStr) return null;
-            const nacimiento = new Date(fechaNacimientoStr);
-            const hoy = new Date();
-            
-            let edad = hoy.getFullYear() - nacimiento.getFullYear();
-            const mesDiff = hoy.getMonth() - nacimiento.getMonth();
-            const diaDiff = hoy.getDate() - nacimiento.getDate();
-            
-            if (mesDiff < 0 || (mesDiff === 0 && diaDiff < 0)) {
-                edad--;
-            }
-            return edad;
-        }
-
-        async function verificarAcceso() {
+        async function autenticarUsuario() {
             const inputDni = document.getElementById('login-dni').value.trim().toUpperCase();
-            
-            if(!inputDni) {
-                Swal.fire('Atención', 'Por favor, escribe tu DNI.', 'warning');
-                return;
-            }
+            if (!inputDni) return Swal.fire('Atención', 'Por favor, introduce tu DNI.', 'warning');
 
-            if (!validarDniNie(inputDni)) {
-                Swal.fire({
-                    title: 'DNI/NIE Incorrecto',
-                    text: 'El formato o la letra del documento introducido no son válidos. Por favor, revísalo.',
-                    icon: 'error',
-                    confirmButtonColor: '#ef4444'
-                });
-                return; 
-            }
-
-            Swal.fire({ title: 'Buscando tu registro...', didOpen: () => Swal.showLoading(), allowOutsideClick: false });
+            Swal.fire({ title: 'Verificando...', didOpen: () => Swal.showLoading(), allowOutsideClick: false });
 
             try {
-                const { data: titular, error } = await _supabase
-                    .from('titulares')
-                    .select('*')
-                    .eq('dni', inputDni)
-                    .maybeSingle();
-
-                if (error || !titular) {
-                    Swal.fire('No encontrado', 'El DNI introducido es correcto, pero no consta en la lista de autorizados del evento.', 'error');
-                    return;
+                const { data, error } = await _supabase.from('titulares').select('*').eq('dni', inputDni).single();
+                if (error || !data) {
+                    return Swal.fire('No autorizado', 'El DNI introducido no consta en el listado de autorizados.', 'error');
                 }
 
-                usuarioDni = inputDni;
-                document.getElementById('nombre-titular').innerText = `${titular.nombre} ${titular.apellido1} ${titular.apellido2 || ''}`;
-                
-                await cargarInvitadosExistentes();
+                usuarioAutenticado = data;
+                document.getElementById('nombre-titular').innerText = `${data.nombre} ${data.apellido1} ${data.apellido2 || ''}`;
+                document.getElementById('dni-titular').innerText = data.dni;
 
                 document.getElementById('pantalla-login').classList.add('hidden');
                 document.getElementById('pantalla-formulario').classList.remove('hidden');
-                Swal.close();
 
-            } catch (err) {
+                await cargarInvitadosExistentes();
+                Swal.close();
+            } catch (e) {
                 Swal.fire('Error', 'Hubo un problema al conectar con el servidor.', 'error');
             }
         }
 
         async function cargarInvitadosExistentes() {
-            const container = document.getElementById('lista-invitados');
-            container.innerHTML = "";
+            const contenedor = document.getElementById('contenedor-tarjetas');
+            contenedor.innerHTML = '';
 
-            const { data: existentes } = await _supabase
-                .from('invitados')
-                .select('*')
-                .eq('titular_dni', usuarioDni)
-                .order('numero_acompanante', { ascending: true });
+            try {
+                // Buscamos ABSOLUTAMENTE TODO lo que pertenezca a este DNI actualmente
+                const { data: todosMisRegistros } = await _supabase
+                    .from('invitados')
+                    .select('*')
+                    .eq('titular_dni', usuarioAutenticado.dni)
+                    .order('numero_acompanante', { ascending: true });
 
-            maxAcompanantesHistoricos = existentes ? existentes.length : 0;
+                const mapaPropios = {};
+                const recibidosExtras = [];
 
-            if (existentes && existentes.length > 0) {
-                const algunDiscapacitado = existentes.some(inv => inv.zona_discapacidad === true);
-                document.getElementById('check-discapacidad').checked = algunDiscapacitado;
-
-                existentes.forEach(inv => {
-                    crearTarjetaEnPantalla(inv.es_excepcion, inv, inv.numero_acompanante);
-                });
-            } else {
-                // CAMBIO: Ahora forzamos la aparición inicial de las 3 INVITACIONES BASE reglamentarias
-                crearTarjetaEnPantalla(false, null, 1);
-                crearTarjetaEnPantalla(false, null, 2);
-                crearTarjetaEnPantalla(false, null, 3);
-                maxAcompanantesHistoricos = 3;
-            }
-            reordenarTitulosVisuales();
-        }
-
-        function crearTarjetaEnPantalla(esExcepcion, datos = null, numeroFijo = null) {
-            const container = document.getElementById('lista-invitados');
-            
-            if (!numeroFijo) {
-                maxAcompanantesHistoricos++;
-                numeroFijo = maxAcompanantesHistoricos;
-            }
-
-            const card = document.createElement('div');
-            card.className = `p-4 rounded-xl border-2 shadow-sm relative space-y-3 tarjeta-dinamica ${esExcepcion ? 'border-amber-300 bg-amber-50/50' : 'border-gray-200 bg-gray-50/50'}`;
-            card.dataset.esExcepcion = esExcepcion;
-            card.dataset.numeroAcompanante = numeroFijo;
-
-            const botonEliminar = esExcepcion 
-                ? `<button type="button" onclick="marcarComoEliminado(this)" class="text-red-500 font-bold text-xs bg-red-50 px-2 py-1 rounded-lg border border-red-200">Eliminar</button>`
-                : '';
-
-            // Solo permitimos ceder entradas de las tres pases base originales (no de las excepciones)
-            // Si en la base de datos consta que ya fue cedida a otro, la tarjeta vendrá marcada
-            const yaCedida = datos && datos.cedido_por_dni && datos.cedido_por_dni !== "";
-            const bloqueCeder = !esExcepcion 
-                ? `<div class="bg-indigo-50/50 p-2 rounded-lg border border-indigo-100 flex flex-col gap-2 mt-1">
-                    <label class="flex items-center gap-2 text-xs font-bold text-indigo-900 cursor-pointer select-none">
-                        <input type="checkbox" class="check-ceder-entrada w-4 h-4 text-indigo-600 rounded focus:ring-indigo-500 cursor-pointer" onchange="conmutarCesion(this)" ${yaCedida ? 'checked' : ''}>
-                        👉 Ceder esta invitación a un compañero
-                    </label>
-                    <div class="capa-dni-companero ${yaCedida ? '' : 'hidden'}">
-                        <label class="block text-[10px] font-bold text-indigo-500 uppercase tracking-wider mb-1 ml-0.5">DNI/NIE del alumno beneficiario</label>
-                        <input type="text" placeholder="Ej: 87654321X" class="inv-cedido-dni w-full p-2.5 text-sm border-2 border-indigo-300 rounded-lg uppercase bg-white focus:outline-none focus:border-indigo-600 font-semibold" value="${yaCedida ? datos.titular_dni : ''}">
-                    </div>
-                   </div>`
-                : '';
-
-            card.innerHTML = `
-                <div class="flex justify-between items-center border-b pb-2 mb-2 ${esExcepcion ? 'border-amber-200' : 'border-gray-200'}">
-                    <span class="titulo-tarjeta-prioridad text-xs uppercase font-extrabold tracking-wider ${esExcepcion ? 'text-amber-700' : 'text-gray-500'}">
-                        Acompañante --
-                    </span>
-                    ${botonEliminar}
-                </div>
-                
-                ${bloqueCeder}
-
-                <!-- Campos de datos familiares del acompañante -->
-                <div class="capa-datos-familiares grid grid-cols-1 gap-2 ${yaCedida ? 'hidden' : ''}">
-                    <input type="text" placeholder="Nombre completo" class="inv-nombre w-full p-3 text-sm border rounded-lg focus:outline-none" value="${datos && !yaCedida ? datos.nombre : ''}">
-                    <input type="text" placeholder="Apellidos" class="inv-apellidos w-full p-3 text-sm border rounded-lg focus:outline-none" value="${datos && !yaCedida ? datos.apellidos : ''}">
-                    <input type="text" placeholder="DNI / NIE del acompañante" class="inv-dni w-full p-3 text-sm border rounded-lg uppercase focus:outline-none" value="${datos && !yaCedida ? (datos.dni || '') : ''}">
-                    
-                    <div>
-                        <label class="block text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-1 ml-1">Fecha de Nacimiento</label>
-                        <input type="date" class="inv-fecha-nacimiento w-full p-3 text-sm border rounded-lg bg-white focus:outline-none text-gray-700" value="${datos && !yaCedida ? datos.fecha_nacimiento : ''}">
-                    </div>
-
-                    <select class="inv-parentesco w-full p-3 text-sm border rounded-lg bg-white focus:outline-none">
-                        <option value="" disabled ${!datos || yaCedida ? 'selected' : ''}>Selecciona parentesco</option>
-                        <option value="Pareja" ${datos && !yaCedida && datos.parentesco === 'Pareja' ? 'selected' : ''}>Pareja</option>
-                        <option value="Hijo/a" ${datos && !yaCedida && datos.parentesco === 'Hijo/a' ? 'selected' : ''}>Hijo/a</option>
-                        <option value="Padre/Madre" ${datos && !yaCedida && datos.parentesco === 'Padre/Madre' ? 'selected' : ''}>Padre/Madre</option>
-                        <option value="Hermano/a" ${datos && !yaCedida && datos.parentesco === 'Hermano/a' ? 'selected' : ''}>Hermano/a</option>
-                        <option value="Otros" ${datos && !yaCedida && datos.parentesco === 'Otros' ? 'selected' : ''}>Otro</option>
-                    </select>
-                </div>
-                ${esExcepcion ? `<div class="mt-2"><textarea placeholder="Justificación breve..." class="inv-motivo w-full p-3 text-xs border border-amber-300 rounded-lg focus:outline-none" rows="2">${datos ? (datos.motivo_excepcion || '') : ''}</textarea></div>` : ''}
-            `;
-            container.appendChild(card);
-            reordenarTitulosVisuales();
-        }
-
-        // ESCONDE LOS DATOS FAMILIARES Y MUESTRA EL DNI CUANDO LE DAN AL TICK
-        function conmutarCesion(check) {
-            const card = check.closest('.tarjeta-dinamica');
-            const capaDni = card.querySelector('.capa-dni-companero');
-            const capaDatos = card.querySelector('.capa-datos-familiares');
-            
-            if(check.checked) {
-                capaDni.classList.remove('hidden');
-                capaDatos.classList.add('hidden');
-            } else {
-                capaDni.classList.add('hidden');
-                capaDatos.classList.remove('hidden');
-            }
-        }
-
-        function marcarComoEliminado(btn) {
-            const card = btn.closest('.tarjeta-dinamica');
-            card.classList.add('hidden', 'para-borrar');
-            reordenarTitulosVisuales();
-        }
-
-        function reordenarTitulosVisuales() {
-            const tarjetas = document.querySelectorAll('.tarjeta-dinamica:not(.para-borrar)');
-            tarjetas.forEach((card, index) => {
-                const tituloSpan = card.querySelector('.titulo-tarjeta-prioridad');
-                if (tituloSpan) {
-                    tituloSpan.innerText = `Acompañante ${index + 1}`;
+                if (todosMisRegistros) {
+                    todosMisRegistros.forEach(inv => {
+                        if (inv.numero_acompanante <= 3) {
+                            // Son tus 3 slots reglamentarios originales
+                            mapaPropios[inv.numero_acompanante] = inv;
+                        } else {
+                            // Es una invitación que te cedió un compañero (ranura > 100)
+                            recibidosExtras.push(inv);
+                        }
+                    });
                 }
-            });
+
+                // 1. Renderizar siempre las 3 ranuras base (estén vacías, rellenas o cedidas desde aquí a otro)
+                for (let i = 1; i <= 3; i++) {
+                    const datosInvitado = mapaPropios[i] || null;
+                    crearTarjetaEnPantalla(datosInvitado, i, "propia");
+                }
+
+                // 2. Renderizar los pases extras que te han cedido a ti (asociados ya a tu DNI)
+                let contadorVisual = 4;
+                recibidosExtras.forEach(invCedido => {
+                    crearTarjetaEnPantalla(invCedido, contadorVisual, "recibida");
+                    contadorVisual++;
+                });
+
+                document.getElementById('contador-pases').innerText = `${3 + recibidosExtras.length} pases gestionados por ti`;
+
+            } catch (e) {
+                console.error("Error al cargar invitados:", e);
+            }
         }
 
-        async function guardarDatos(event) {
-            event.preventDefault();
+        function crearTarjetaEnPantalla(datos, numeroVisual, tipoTarjeta) {
+            const contenedor = document.getElementById('contenedor-tarjetas');
+            const card = document.createElement('div');
+            card.dataset.numeroVisual = numeroVisual;
+            card.dataset.slotOriginal = datos ? datos.numero_acompanante : numeroVisual;
+            card.dataset.tipo = tipoTarjeta;
 
-            const checkLopd = document.getElementById('check-lopd');
-            if (!checkLopd.checked) {
-                Swal.fire('Requisito Legal', 'Para enviar el formulario debes aceptar la cláusula de protección de datos.', 'warning');
-                return;
+            // Detectar si esta tarjeta fue cedida por ti hacia otra persona en el pasado
+            const yaCedidaHaciaAfuera = tipoTarjeta === "propia" && datos && datos.cedido_por_dni && datos.cedido_por_dni !== usuarioAutenticado.dni && datos.dni === "CEDIDO";
+
+            if (tipoTarjeta === "recibida") {
+                // TARJETA CEDIDA QUE YA ES TUYA
+                card.className = "bg-emerald-50 border-2 border-emerald-400 rounded-xl shadow-sm p-4 space-y-4 relative";
+                card.innerHTML = `
+                    <div class="flex justify-between items-center border-b border-emerald-200 pb-2">
+                        <span class="text-sm font-bold text-emerald-700 uppercase tracking-wider">Invitación Extra (Recibida)</span>
+                        <span class="text-[10px] bg-emerald-200 text-emerald-800 font-bold px-2 py-0.5 rounded-full">Procedente de: ${datos.cedido_por_dni}</span>
+                    </div>
+                    ${obtenerCamposFormulario(datos)}
+                `;
+            } else {
+                // TARJETA REGLAMENTARIA (1, 2 o 3)
+                card.className = "bg-white border rounded-xl shadow-sm p-4 space-y-4 relative transition-all duration-300";
+                card.innerHTML = `
+                    <div class="flex justify-between items-center border-b pb-2">
+                        <span class="text-sm font-bold text-indigo-600 uppercase tracking-wider">Invitación #${numeroVisual}</span>
+                        <label class="flex items-center gap-1.5 text-xs font-semibold text-gray-600 bg-gray-50 px-2 py-1 rounded-lg cursor-pointer hover:bg-gray-100 border">
+                            <input type="checkbox" class="chk-ceder rounded text-indigo-600 focus:ring-indigo-500" ${yaCedidaHaciaAfuera ? 'checked' : ''} onchange="alternarCamposCedido(this)">
+                            Ceder Pase
+                        </label>
+                    </div>
+
+                    <div class="div-dni-beneficiario ${yaCedidaHaciaAfuera ? '' : 'hidden'} bg-amber-50 p-3 rounded-lg border border-amber-200 space-y-2">
+                        <label class="block text-xs font-bold text-amber-800 uppercase">DNI/NIE del Alumno Beneficiario:</label>
+                        <input type="text" class="txt-cedido-dni w-full p-2 border border-amber-300 rounded uppercase font-mono text-center tracking-wider bg-white" placeholder="Ej: 87654321X" value="${yaCedidaHaciaAfuera ? datos.titular_dni : ''}">
+                        <p class="text-[10px] text-amber-600 italic">Al guardar, esta tarjeta desaparecerá de tus opciones y se sumará al panel de tu compañero de forma definitiva.</p>
+                    </div>
+
+                    <div class="div-campos-invitado ${yaCedidaHaciaAfuera ? 'hidden' : ''} space-y-3">
+                        ${obtenerCamposFormulario(yaCedidaHaciaAfuera ? null : datos)}
+                    </div>
+                `;
             }
 
-            const requiereZonaAdaptada = document.getElementById('check-discapacidad').checked;
-            const tarjetas = document.getElementsByClassName('tarjeta-dinamica');
+            contenedor.appendChild(card);
+        }
+
+        function obtenerCamposFormulario(datos) {
+            return `
+                <div class="grid grid-cols-2 gap-2">
+                    <div>
+                        <label class="block text-[10px] font-bold text-gray-400 uppercase">Nombre</label>
+                        <input type="text" class="txt-nombre w-full p-2 border rounded text-sm" value="${datos?.nombre || ''}">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold text-gray-400 uppercase">Apellidos</label>
+                        <input type="text" class="txt-apellidos w-full p-2 border rounded text-sm" value="${datos?.apellidos || ''}">
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-2">
+                    <div>
+                        <label class="block text-[10px] font-bold text-gray-400 uppercase">DNI / NIE</label>
+                        <input type="text" class="txt-dni w-full p-2 border rounded text-sm uppercase font-mono" value="${datos?.dni && datos.dni !== 'CEDIDO' ? datos.dni : ''}">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold text-gray-400 uppercase">Parentesco</label>
+                        <select class="sel-parentesco w-full p-2 border rounded text-sm bg-white">
+                            <option value="Otros" ${datos?.parentesco === 'Otros' ? 'selected' : ''}>Otros</option>
+                            <option value="Pareja" ${datos?.parentesco === 'Pareja' ? 'selected' : ''}>Pareja</option>
+                            <option value="Hijo/a" ${datos?.parentesco === 'Hijo/a' ? 'selected' : ''}>Hijo/a</option>
+                            <option value="Padre/Madre" ${datos?.parentesco === 'Padre/Madre' ? 'selected' : ''}>Padre/Madre</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-2 pt-1 border-t border-gray-50">
+                    <label class="flex items-center gap-1.5 text-xs font-medium text-gray-600 cursor-pointer">
+                        <input type="checkbox" class="chk-discapacidad rounded text-indigo-600" ${datos?.zona_discapacidad ? 'checked' : ''}>
+                        Movilidad Reducida
+                    </label>
+                    <label class="flex items-center gap-1.5 text-xs font-medium text-gray-600 cursor-pointer">
+                        <input type="checkbox" class="chk-excepcion rounded text-indigo-600" ${datos?.es_excepcion ? 'checked' : ''} onchange="this.closest('.space-y-3').querySelector('.div-motivo').classList.toggle('hidden', !this.checked)">
+                        ¿Es Excepción?
+                    </label>
+                </div>
+                <div class="div-motivo ${datos?.es_excepcion ? '' : 'hidden'} space-y-1">
+                    <label class="block text-[10px] font-bold text-red-500 uppercase">Justificación</label>
+                    <input type="text" class="txt-motivo w-full p-2 border border-red-200 rounded text-sm bg-red-50" placeholder="Motivo breve..." value="${datos?.motivo_excepcion || ''}">
+                </div>
+            `;
+        }
+
+        function alternarCamposCedido(checkbox) {
+            const card = checkbox.closest('[data-numero-visual]');
+            const divBeneficiario = card.querySelector('.div-dni-beneficiario');
+            const divCamposInvitado = card.querySelector('.div-campos-invitado');
+
+            if (checkbox.checked) {
+                divBeneficiario.classList.remove('hidden');
+                divCamposInvitado.classList.add('hidden');
+            } else {
+                divBeneficiario.classList.add('hidden');
+                divCamposInvitado.classList.remove('hidden');
+            }
+        }
+
+        async function guardarDatos() {
+            const tarjetas = document.querySelectorAll('#contenedor-tarjetas > div');
             const listaParaUpsert = [];
 
-            let indexVisual = 0;
-
             for (let card of tarjetas) {
-                const numPosicion = parseInt(card.dataset.numeroAcompanante);
-                const esExcepcion = card.dataset.esExcepcion === "true";
+                const tipo = card.dataset.tipo;
+                const slotOriginal = parseInt(card.dataset.slotOriginal);
 
-                if (card.classList.contains('para-borrar')) {
-                    listaParaUpsert.push({
-                        titular_dni: usuarioDni,
-                        numero_acompanante: numPosicion,
-                        nombre: "",
-                        apellidos: "",
-                        dni: null,
-                        parentesco: "Otros",
-                        es_excepcion: esExcepcion,
-                        motivo_excepcion: null,
-                        zona_discapacidad: false,
-                        fecha_nacimiento: null,
-                        edad_actual: null,
-                        cedido_por_dni: null
-                    });
-                    continue;
-                }
+                const nombre = card.querySelector('.txt-nombre').value.trim();
+                const apellidos = card.querySelector('.txt-apellidos').value.trim();
+                const dni = card.querySelector('.txt-dni').value.trim().toUpperCase();
+                const parentesco = card.querySelector('.sel-parentesco').value;
+                const movilidad = card.querySelector('.chk-discapacidad').checked;
+                const excepcion = card.querySelector('.chk-excepcion').checked;
+                const motivo = excepcion ? card.querySelector('.txt-motivo').value.trim() : null;
 
-                indexVisual++;
-                
-                // Comprobamos si el tick de ceder invitación está marcado
-                const checkCeder = card.querySelector('.check-ceder-entrada');
-                const esCedida = checkCeder && checkCeder.checked;
-
-                if (esCedida) {
-                    const dniBeneficiario = card.querySelector('.inv-cedido-dni').value.trim().toUpperCase();
+                if (tipo === "propia") {
+                    const chkCeder = card.querySelector('.chk-ceder');
                     
-                    if (!dniBeneficiario) {
-                        Swal.fire('Falta DNI', `Has marcado ceder la invitación en el Acompañante ${indexVisual}, por favor pon el DNI de tu compañero.`, 'warning');
-                        return;
-                    }
-                    if (!validarDniNie(dniBeneficiario)) {
-                        Swal.fire('DNI Incorrecto', `El DNI del compañero al que le cedes el Acompañante ${indexVisual} no es válido.`, 'error');
-                        return;
-                    }
-                    if (dniBeneficiario === usuarioDni) {
-                        Swal.fire('Error', `No puedes cederte una entrada a ti mismo en el Acompañante ${indexVisual}.`, 'warning');
-                        return;
-                    }
-
-                    // LA MAGIA: Se registra asignándole el DNI del compañero beneficiario
-                    // Para evitar que colisione con las suyas, usamos un número de ranura alto basado en el DNI emisor
-                    const ranuraEspecial = 100 + numPosicion; 
-
-                    listaParaUpsert.push({
-                        titular_dni: dniBeneficiario,          // Va directo a la cuenta del compañero
-                        numero_acompanante: ranuraEspecial,     
-                        nombre: "Pase Cedido",                 // Marcadores visuales para que el compañero sepa qué es
-                        apellidos: `Por ${usuarioDni}`,
-                        dni: "CEDIDO",
-                        parentesco: "Otros",
-                        es_excepcion: false,
-                        motivo_excepcion: null,
-                        zona_discapacidad: requiereZonaAdaptada,
-                        fecha_nacimiento: "2000-01-01", 
-                        edad_actual: 26,
-                        cedido_por_dni: usuarioDni             // Guardamos quién la cedió originalmente
-                    });
-
-                } else {
-                    // Flujo normal para acompañantes normales que se quedan en la familia
-                    const nombre = card.querySelector('.inv-nombre').value.trim();
-                    const apellidos = card.querySelector('.inv-apellidos').value.trim();
-                    const dni = card.querySelector('.inv-dni').value.trim().toUpperCase();
-                    const fechaNac = card.querySelector('.inv-fecha-nacimiento').value;
-                    const parentesco = card.querySelector('.inv-parentesco').value;
-                    const motivo = esExcepcion ? card.querySelector('.inv-motivo').value.trim() : null;
-
-                    if (nombre || apellidos || dni || fechaNac || parentesco) {
-                        if (!nombre || !apellidos) {
-                            Swal.fire('Atención', `Por favor, completa el nombre y apellidos del Acompañante ${indexVisual}.`, 'warning');
-                            return;
+                    if (chkCeder.checked) {
+                        const dniCompanero = card.querySelector('.txt-cedido-dni').value.trim().toUpperCase();
+                        if (!dniCompanero) {
+                            return Swal.fire('Falta DNI', `Indica el DNI del compañero en la Invitación #${card.dataset.numeroVisual}.`, 'warning');
                         }
-                        if (!dni) {
-                            Swal.fire('DNI Obligatorio', `El DNI del Acompañante ${indexVisual} (${nombre}) es obligatorio.`, 'compressed');
-                            return;
-                        }
-                        if (!validarDniNie(dni)) {
-                            Swal.fire({ title: 'DNI Incorrecto', text: `La letra o formato del DNI para el Acompañante ${indexVisual} no es válido.`, icon: 'error' });
-                            return;
-                        }
-                        if (!fechaNac) {
-                            Swal.fire('Fecha Obligatoria', `Introduce la fecha de nacimiento del Acompañante ${indexVisual}.`, 'warning');
-                            return;
+                        if (dniCompanero === usuarioAutenticado.dni) {
+                            return Swal.fire('Error', 'No puedes cederte una invitación a ti mismo.', 'error');
                         }
 
-                        const edadCalculada = calcularEdadExacta(fechaNac);
-
-                        if (!parentesco) {
-                            Swal.fire('Atención', `Selecciona el parentesco para el Acompañante ${indexVisual}.`, 'warning');
-                            return;
-                        }
-                        if (esExcepcion && !motivo) {
-                            Swal.fire('Atención', `Por favor, justifica el caso excepcional del Acompañante ${indexVisual}.`, 'warning');
-                            return;
-                        }
-
+                        // LA CLAVE: Registramos la fila directamente vinculada al DNI de tu compañero.
+                        // Usamos una ranura especial única (100 + slot actual) para que no pise sus pases 1, 2 y 3.
                         listaParaUpsert.push({
-                            titular_dni: usuarioDni,
-                            numero_acompanante: numPosicion,
-                            nombre: nombre,
-                            apellidos: apellidos,
-                            dni: dni,
+                            titular_dni: dniCompanero,             // Propiedad total de tu compañero
+                            numero_acompanante: 100 + slotOriginal, // Evita colisiones
+                            nombre: "", 
+                            apellidos: "", 
+                            dni: "CEDIDO", 
                             parentesco: parentesco,
-                            es_excepcion: esExcepcion,
+                            zona_discapacidad: movilidad,
+                            es_excepcion: excepcion,
                             motivo_excepcion: motivo,
-                            zona_discapacidad: requiereZonaAdaptada,
-                            fecha_nacimiento: fechaNac,
-                            edad_actual: edadCalculada,
+                            cedido_por_dni: usuarioAutenticado.dni  // Marcamos quién se la dio originalmente
+                        });
+                    } else {
+                        // Guardado normal de tus pases nativos que te quedas tú
+                        listaParaUpsert.push({
+                            titular_dni: usuarioAutenticado.dni,
+                            numero_acompanante: slotOriginal,
+                            nombre: nombre || null,
+                            apellidos: apellidos || null,
+                            dni: dni || null,
+                            parentesco: parentesco,
+                            zona_discapacidad: movilidad,
+                            es_excepcion: excepcion,
+                            motivo_excepcion: motivo,
                             cedido_por_dni: null
                         });
                     }
+                } else if (tipo === "recibida") {
+                    // Si estás modificando una tarjeta que te han cedido a ti, se guarda bajo tu DNI 
+                    // conservando su número de ranura especial (>100) y su procedencia original.
+                    const { data: datosViejos } = await _supabase
+                        .from('invitados')
+                        .select('cedido_por_dni')
+                        .eq('titular_dni', usuarioAutenticado.dni)
+                        .eq('numero_acompanante', slotOriginal)
+                        .single();
+
+                    listaParaUpsert.push({
+                        titular_dni: usuarioAutenticado.dni,
+                        numero_acompanante: slotOriginal,
+                        nombre: nombre || null,
+                        apellidos: apellidos || null,
+                        dni: dni || null,
+                        parentesco: parentesco,
+                        zona_discapacidad: movilidad,
+                        es_excepcion: excepcion,
+                        motivo_excepcion: motivo,
+                        cedido_por_dni: datosViejos?.cedido_por_dni || null
+                    });
                 }
             }
 
-            Swal.fire({ title: 'Guardando cambios...', didOpen: () => Swal.showLoading(), allowOutsideClick: false });
+            Swal.fire({ title: 'Sincronizando con Supabase...', didOpen: () => Swal.showLoading(), allowOutsideClick: false });
 
             try {
                 if (listaParaUpsert.length > 0) {
@@ -454,15 +336,30 @@
                     if (error) throw error;
                 }
 
+                // Si cediste un pase propio, necesitamos asegurarnos de limpiar tu ranura original (1, 2 o 3)
+                // en tu cuenta para que no se quede duplicada.
+                for (let card of tarjetas) {
+                    if (card.dataset.tipo === "propia" && card.querySelector('.chk-ceder').checked) {
+                        await _supabase
+                            .from('invitados')
+                            .delete()
+                            .eq('titular_dni', usuarioAutenticado.dni)
+                            .eq('numero_acompanante', parseInt(card.dataset.slotOriginal));
+                    }
+                }
+
                 Swal.fire({
-                    title: '¡Todo guardado!',
-                    text: 'Las invitaciones y cesiones se han procesado correctamente.',
+                    title: '¡Operación Exitosa!',
+                    text: 'Los pases han sido asignados y asociados correctamente.',
                     icon: 'success',
                     confirmButtonColor: '#4f46e5'
-                }).then(() => location.reload());
+                }).then(() => {
+                    cargarInvitadosExistentes();
+                });
 
             } catch (e) {
-                Swal.fire('Error', 'No se pudieron sincronizar los datos con el servidor.', 'error');
+                console.error(e);
+                Swal.fire('Error', 'Error de sincronización con la base de datos.', 'error');
             }
         }
     </script>
