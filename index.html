@@ -17,7 +17,6 @@
             <p class="text-indigo-200 text-sm mt-1">Confirmación y Gestión de Invitados</p>
         </header>
 
-        <!-- PANTALLA 1: LOGIN -->
         <div id="pantalla-login" class="p-6 flex-grow flex flex-col justify-center items-center">
             <div class="w-full space-y-4">
                 <div class="text-center mb-6">
@@ -33,7 +32,6 @@
             </div>
         </div>
 
-        <!-- PANTALLA 2: FORMULARIO -->
         <div id="pantalla-formulario" class="p-6 flex-grow hidden space-y-6">
             <div class="bg-indigo-50 p-4 rounded-xl border border-indigo-100">
                 <span class="text-xs uppercase font-bold text-indigo-500 tracking-wider">Titular Autorizado</span>
@@ -46,14 +44,12 @@
             <form id="form-invitados" onsubmit="guardarDatos(event)" class="space-y-6">
                 <div id="lista-invitados" class="space-y-4"></div>
 
-                <!-- BOTONERA ÚNICA -->
                 <div class="flex justify-center">
                     <button type="button" onclick="crearTarjetaEnPantalla(true, null)" class="w-full border-2 border-dashed border-amber-400 text-amber-800 bg-amber-50 font-bold p-3 rounded-xl flex items-center justify-center gap-2 hover:bg-amber-100 transition-colors text-sm shadow-sm">
                         <span>➕ Solicitar Caso Excepcional</span>
                     </button>
                 </div>
 
-                <!-- CASILLA: ZONA HABILITADA DISCAPACIDAD -->
                 <div class="bg-blue-50 p-4 rounded-xl border border-blue-200 mt-4">
                     <div class="flex items-start">
                         <div class="flex items-center h-5">
@@ -68,7 +64,6 @@
                     </div>
                 </div>
 
-                <!-- CASILLA LEGAL LOPD -->
                 <div class="bg-gray-50 p-4 rounded-xl border border-gray-200">
                     <div class="flex items-start">
                         <div class="flex items-center h-5">
@@ -184,14 +179,12 @@
             const container = document.getElementById('lista-invitados');
             container.innerHTML = "";
 
-            // 1. Descargamos las invitaciones registradas a nombre de este DNI
             const { data: guardadas } = await _supabase
                 .from('invitados')
                 .select('*')
                 .eq('titular_dni', usuarioDni)
                 .order('numero_acompanante', { ascending: true });
 
-            // 2. Descargamos si este DNI cedió pases a otros compañeros
             const { data: cesionesRealizadas } = await _supabase
                 .from('invitados')
                 .select('*')
@@ -214,13 +207,9 @@
                 }
             });
 
-            // Recopilamos todos los DNIs emisores únicos que le han cedido entradas a este alumno
             const dnisEmisores = [...new Set(pasesCedidosRecibidos.map(inv => inv.cedido_por_dni).filter(Boolean))];
-            
-            // MAPA TRADUCTOR DE DNI A NOMBRE REAL
             const diccionarioNombresEmisores = {};
 
-            // CONSULTA TRADUCTORA MAGISTRAL A LA TABLA DE TITULARES
             if (dnisEmisores.length > 0) {
                 const { data: datosEmisores } = await _supabase
                     .from('titulares')
@@ -234,11 +223,9 @@
                 }
             }
 
-            // Control de la casilla de discapacidad (solo aplica a familiares reales propios)
             const algunFamiliarDiscapacitado = listadoPropios.some(inv => inv.numero_acompanante <= 100 && inv.zona_discapacidad === true);
             document.getElementById('check-discapacidad').checked = algunFamiliarDiscapacitado;
 
-            // --- PINTAR LAS 3 INVITACIONES REGLAMENTARIAS BASE ---
             for (let r = 1; r <= 3; r++) {
                 const cesionEfectuada = listadoCesiones.find(c => (c.numero_acompanante > 100 ? (c.numero_acompanante - 100) : c.numero_acompanante) === r);
                 const baseGuardada = pasesBasePropios.find(b => b.numero_acompanante === r);
@@ -252,13 +239,11 @@
                 }
             }
 
-            // --- PINTAR LOS PASES QUE LE CEDIERON AL ALUMNO (CON TRADUCCIÓN DE NOMBRE) ---
             pasesCedidosRecibidos.forEach(inv => {
                 const nombreHumanoEmisor = diccionarioNombresEmisores[inv.cedido_por_dni] || inv.cedido_por_dni;
                 crearTarjetaEnPantalla(false, inv, inv.numero_acompanante, false, nombreHumanoEmisor);
             });
 
-            // --- PINTAR LOS CASOS EXCEPCIONALES ---
             excepcionesPropias.forEach(inv => {
                 crearTarjetaEnPantalla(true, inv, inv.numero_acompanante, false);
             });
@@ -294,7 +279,6 @@
 
             if (esRecibidaDeCompanero) {
                 card.dataset.cedidoPorDni = emisorDniReal; 
-                // MEJORA VISUAL: Si disponemos del nombre real, lo mostramos en mayúsculas de forma destacada
                 const textoEmisor = nombreHumanoEmisor ? nombreHumanoEmisor.toUpperCase() : emisorDniReal;
                 avisoCabeceraExtra = `<div class="text-[11px] bg-green-50 text-green-700 font-bold px-3 py-1.5 rounded-md border border-green-200 mt-1 flex items-center gap-1">🎁 Invitación cedida por tu compañero: <span class="underline">${textoEmisor}</span></div>`;
             } else if (!esExcepcion) {
@@ -435,13 +419,13 @@
 
                     const ranuraEspecial = 100 + numPosicion; 
 
+                    // CORREGIDO: Eliminada la variable errónea que provocaba el fallo de sincronización
                     listaParaUpsert.push({
                         titular_dni: dniBeneficiario, numero_acompanante: ranuraEspecial,     
                         nombre: "Pase Cedido", apellidos: `Por ${usuarioDni}`, dni: "CEDIDO",
                         parentesco: "Otros", es_excepcion: false, motivo_excepcion: null,
                         zona_discapacidad: false, fecha_nacimiento: "2000-01-01", 
-                        disabled_nacimiento: true, edad_actual: 26, cedido_por_dni: usuarioDni, 
-                        asignacion_grada: null, asignacion_asiento: null
+                        edad_actual: 26, cedido_por_dni: usuarioDni, asignacion_grada: null, asignacion_asiento: null
                     });
 
                 } else {
