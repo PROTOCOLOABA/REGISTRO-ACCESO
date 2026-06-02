@@ -35,7 +35,6 @@
 
         <!-- PANTALLA 2: FORMULARIO -->
         <div id="pantalla-formulario" class="p-6 flex-grow hidden space-y-6">
-            <!-- CABECERA CORREGIDA Y PULIDA -->
             <div class="bg-indigo-50 p-4 rounded-xl border border-indigo-100">
                 <span class="text-xs uppercase font-bold text-indigo-500 tracking-wider">Titular Autorizado</span>
                 <h2 id="nombre-titular" class="text-xl font-bold text-gray-800">Cargando...</h2>
@@ -201,9 +200,11 @@
                     crearTarjetaEnPantalla(inv.es_excepcion, inv, inv.numero_acompanante);
                 });
             } else {
+                // CAMBIO: Ahora forzamos la aparición inicial de las 3 INVITACIONES BASE reglamentarias
                 crearTarjetaEnPantalla(false, null, 1);
                 crearTarjetaEnPantalla(false, null, 2);
-                maxAcompanantesHistoricos = 2;
+                crearTarjetaEnPantalla(false, null, 3);
+                maxAcompanantesHistoricos = 3;
             }
             reordenarTitulosVisuales();
         }
@@ -225,6 +226,22 @@
                 ? `<button type="button" onclick="marcarComoEliminado(this)" class="text-red-500 font-bold text-xs bg-red-50 px-2 py-1 rounded-lg border border-red-200">Eliminar</button>`
                 : '';
 
+            // Solo permitimos ceder entradas de las tres pases base originales (no de las excepciones)
+            // Si en la base de datos consta que ya fue cedida a otro, la tarjeta vendrá marcada
+            const yaCedida = datos && datos.cedido_por_dni && datos.cedido_por_dni !== "";
+            const bloqueCeder = !esExcepcion 
+                ? `<div class="bg-indigo-50/50 p-2 rounded-lg border border-indigo-100 flex flex-col gap-2 mt-1">
+                    <label class="flex items-center gap-2 text-xs font-bold text-indigo-900 cursor-pointer select-none">
+                        <input type="checkbox" class="check-ceder-entrada w-4 h-4 text-indigo-600 rounded focus:ring-indigo-500 cursor-pointer" onchange="conmutarCesion(this)" ${yaCedida ? 'checked' : ''}>
+                        👉 Ceder esta invitación a un compañero
+                    </label>
+                    <div class="capa-dni-companero ${yaCedida ? '' : 'hidden'}">
+                        <label class="block text-[10px] font-bold text-indigo-500 uppercase tracking-wider mb-1 ml-0.5">DNI/NIE del alumno beneficiario</label>
+                        <input type="text" placeholder="Ej: 87654321X" class="inv-cedido-dni w-full p-2.5 text-sm border-2 border-indigo-300 rounded-lg uppercase bg-white focus:outline-none focus:border-indigo-600 font-semibold" value="${yaCedida ? datos.titular_dni : ''}">
+                    </div>
+                   </div>`
+                : '';
+
             card.innerHTML = `
                 <div class="flex justify-between items-center border-b pb-2 mb-2 ${esExcepcion ? 'border-amber-200' : 'border-gray-200'}">
                     <span class="titulo-tarjeta-prioridad text-xs uppercase font-extrabold tracking-wider ${esExcepcion ? 'text-amber-700' : 'text-gray-500'}">
@@ -232,29 +249,48 @@
                     </span>
                     ${botonEliminar}
                 </div>
-                <div class="grid grid-cols-1 gap-2">
-                    <input type="text" placeholder="Nombre completo" class="inv-nombre w-full p-3 text-sm border rounded-lg focus:outline-none" value="${datos ? datos.nombre : ''}">
-                    <input type="text" placeholder="Apellidos" class="inv-apellidos w-full p-3 text-sm border rounded-lg focus:outline-none" value="${datos ? datos.apellidos : ''}">
-                    <input type="text" placeholder="DNI / NIE del acompañante" class="inv-dni w-full p-3 text-sm border rounded-lg uppercase focus:outline-none" value="${datos ? (datos.dni || '') : ''}">
+                
+                ${bloqueCeder}
+
+                <!-- Campos de datos familiares del acompañante -->
+                <div class="capa-datos-familiares grid grid-cols-1 gap-2 ${yaCedida ? 'hidden' : ''}">
+                    <input type="text" placeholder="Nombre completo" class="inv-nombre w-full p-3 text-sm border rounded-lg focus:outline-none" value="${datos && !yaCedida ? datos.nombre : ''}">
+                    <input type="text" placeholder="Apellidos" class="inv-apellidos w-full p-3 text-sm border rounded-lg focus:outline-none" value="${datos && !yaCedida ? datos.apellidos : ''}">
+                    <input type="text" placeholder="DNI / NIE del acompañante" class="inv-dni w-full p-3 text-sm border rounded-lg uppercase focus:outline-none" value="${datos && !yaCedida ? (datos.dni || '') : ''}">
                     
                     <div>
                         <label class="block text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-1 ml-1">Fecha de Nacimiento</label>
-                        <input type="date" class="inv-fecha-nacimiento w-full p-3 text-sm border rounded-lg bg-white focus:outline-none text-gray-700" value="${datos ? datos.fecha_nacimiento : ''}">
+                        <input type="date" class="inv-fecha-nacimiento w-full p-3 text-sm border rounded-lg bg-white focus:outline-none text-gray-700" value="${datos && !yaCedida ? datos.fecha_nacimiento : ''}">
                     </div>
 
                     <select class="inv-parentesco w-full p-3 text-sm border rounded-lg bg-white focus:outline-none">
-                        <option value="" disabled ${!datos ? 'selected' : ''}>Selecciona parentesco</option>
-                        <option value="Pareja" ${datos && datos.parentesco === 'Pareja' ? 'selected' : ''}>Pareja</option>
-                        <option value="Hijo/a" ${datos && datos.parentesco === 'Hijo/a' ? 'selected' : ''}>Hijo/a</option>
-                        <option value="Padre/Madre" ${datos && datos.parentesco === 'Padre/Madre' ? 'selected' : ''}>Padre/Madre</option>
-                        <option value="Hermano/a" ${datos && datos.parentesco === 'Hermano/a' ? 'selected' : ''}>Hermano/a</option>
-                        <option value="Otros" ${datos && datos.parentesco === 'Otros' ? 'selected' : ''}>Otro</option>
+                        <option value="" disabled ${!datos || yaCedida ? 'selected' : ''}>Selecciona parentesco</option>
+                        <option value="Pareja" ${datos && !yaCedida && datos.parentesco === 'Pareja' ? 'selected' : ''}>Pareja</option>
+                        <option value="Hijo/a" ${datos && !yaCedida && datos.parentesco === 'Hijo/a' ? 'selected' : ''}>Hijo/a</option>
+                        <option value="Padre/Madre" ${datos && !yaCedida && datos.parentesco === 'Padre/Madre' ? 'selected' : ''}>Padre/Madre</option>
+                        <option value="Hermano/a" ${datos && !yaCedida && datos.parentesco === 'Hermano/a' ? 'selected' : ''}>Hermano/a</option>
+                        <option value="Otros" ${datos && !yaCedida && datos.parentesco === 'Otros' ? 'selected' : ''}>Otro</option>
                     </select>
                 </div>
                 ${esExcepcion ? `<div class="mt-2"><textarea placeholder="Justificación breve..." class="inv-motivo w-full p-3 text-xs border border-amber-300 rounded-lg focus:outline-none" rows="2">${datos ? (datos.motivo_excepcion || '') : ''}</textarea></div>` : ''}
             `;
             container.appendChild(card);
             reordenarTitulosVisuales();
+        }
+
+        // ESCONDE LOS DATOS FAMILIARES Y MUESTRA EL DNI CUANDO LE DAN AL TICK
+        function conmutarCesion(check) {
+            const card = check.closest('.tarjeta-dinamica');
+            const capaDni = card.querySelector('.capa-dni-companero');
+            const capaDatos = card.querySelector('.capa-datos-familiares');
+            
+            if(check.checked) {
+                capaDni.classList.remove('hidden');
+                capaDatos.classList.add('hidden');
+            } else {
+                capaDni.classList.add('hidden');
+                capaDatos.classList.remove('hidden');
+            }
         }
 
         function marcarComoEliminado(btn) {
@@ -304,69 +340,106 @@
                         motivo_excepcion: null,
                         zona_discapacidad: false,
                         fecha_nacimiento: null,
-                        edad_actual: null
+                        edad_actual: null,
+                        cedido_por_dni: null
                     });
                     continue;
                 }
 
                 indexVisual++;
-                const nombre = card.querySelector('.inv-nombre').value.trim();
-                const apellidos = card.querySelector('.inv-apellidos').value.trim();
-                const dni = card.querySelector('.inv-dni').value.trim().toUpperCase();
-                const fechaNac = card.querySelector('.inv-fecha-nacimiento').value;
-                const parentesco = card.querySelector('.inv-parentesco').value;
-                const motivo = esExcepcion ? card.querySelector('.inv-motivo').value.trim() : null;
+                
+                // Comprobamos si el tick de ceder invitación está marcado
+                const checkCeder = card.querySelector('.check-ceder-entrada');
+                const esCedida = checkCeder && checkCeder.checked;
 
-                if (nombre || apellidos || dni || fechaNac || parentesco) {
-                    if (!nombre || !apellidos) {
-                        Swal.fire('Atención', `Por favor, completa el nombre y apellidos del Acompañante ${indexVisual}.`, 'warning');
-                        return;
-                    }
+                if (esCedida) {
+                    const dniBeneficiario = card.querySelector('.inv-cedido-dni').value.trim().toUpperCase();
                     
-                    if (!dni) {
-                        Swal.fire('DNI Obligatorio', `El DNI del Acompañante ${indexVisual} (${nombre}) es obligatorio.`, 'warning');
+                    if (!dniBeneficiario) {
+                        Swal.fire('Falta DNI', `Has marcado ceder la invitación en el Acompañante ${indexVisual}, por favor pon el DNI de tu compañero.`, 'warning');
                         return;
                     }
-                    
-                    if (!validarDniNie(dni)) {
-                        Swal.fire({
-                            title: 'DNI Incorrecto',
-                            text: `La letra o formato del DNI introducido para el Acompañante ${indexVisual} (${nombre}) no es válido.`,
-                            icon: 'error',
-                            confirmButtonColor: '#ef4444'
-                        });
+                    if (!validarDniNie(dniBeneficiario)) {
+                        Swal.fire('DNI Incorrecto', `El DNI del compañero al que le cedes el Acompañante ${indexVisual} no es válido.`, 'error');
                         return;
                     }
-
-                    if (!fechaNac) {
-                        Swal.fire('Fecha Obligatoria', `Por favor, introduce la fecha de nacimiento del Acompañante ${indexVisual} (${nombre}).`, 'warning');
+                    if (dniBeneficiario === usuarioDni) {
+                        Swal.fire('Error', `No puedes cederte una entrada a ti mismo en el Acompañante ${indexVisual}.`, 'warning');
                         return;
                     }
 
-                    const edadCalculada = calcularEdadExacta(fechaNac);
-
-                    if (!parentesco) {
-                        Swal.fire('Atención', `Por favor, selecciona el parentesco para ${nombre}.`, 'warning');
-                        return;
-                    }
-                    if (esExcepcion && !motivo) {
-                        Swal.fire('Atención', `Por favor, justifica el caso excepcional de ${nombre}.`, 'warning');
-                        return;
-                    }
+                    // LA MAGIA: Se registra asignándole el DNI del compañero beneficiario
+                    // Para evitar que colisione con las suyas, usamos un número de ranura alto basado en el DNI emisor
+                    const ranuraEspecial = 100 + numPosicion; 
 
                     listaParaUpsert.push({
-                        titular_dni: usuarioDni,
-                        numero_acompanante: numPosicion,
-                        nombre: nombre,
-                        apellidos: apellidos,
-                        dni: dni,
-                        parentesco: parentesco,
-                        es_excepcion: esExcepcion,
-                        motivo_excepcion: motivo,
+                        titular_dni: dniBeneficiario,          // Va directo a la cuenta del compañero
+                        numero_acompanante: ranuraEspecial,     
+                        nombre: "Pase Cedido",                 // Marcadores visuales para que el compañero sepa qué es
+                        apellidos: `Por ${usuarioDni}`,
+                        dni: "CEDIDO",
+                        parentesco: "Otros",
+                        es_excepcion: false,
+                        motivo_excepcion: null,
                         zona_discapacidad: requiereZonaAdaptada,
-                        fecha_nacimiento: fechaNac,
-                        edad_actual: edadCalculada
+                        fecha_nacimiento: "2000-01-01", 
+                        edad_actual: 26,
+                        cedido_por_dni: usuarioDni             // Guardamos quién la cedió originalmente
                     });
+
+                } else {
+                    // Flujo normal para acompañantes normales que se quedan en la familia
+                    const nombre = card.querySelector('.inv-nombre').value.trim();
+                    const apellidos = card.querySelector('.inv-apellidos').value.trim();
+                    const dni = card.querySelector('.inv-dni').value.trim().toUpperCase();
+                    const fechaNac = card.querySelector('.inv-fecha-nacimiento').value;
+                    const parentesco = card.querySelector('.inv-parentesco').value;
+                    const motivo = esExcepcion ? card.querySelector('.inv-motivo').value.trim() : null;
+
+                    if (nombre || apellidos || dni || fechaNac || parentesco) {
+                        if (!nombre || !apellidos) {
+                            Swal.fire('Atención', `Por favor, completa el nombre y apellidos del Acompañante ${indexVisual}.`, 'warning');
+                            return;
+                        }
+                        if (!dni) {
+                            Swal.fire('DNI Obligatorio', `El DNI del Acompañante ${indexVisual} (${nombre}) es obligatorio.`, 'compressed');
+                            return;
+                        }
+                        if (!validarDniNie(dni)) {
+                            Swal.fire({ title: 'DNI Incorrecto', text: `La letra o formato del DNI para el Acompañante ${indexVisual} no es válido.`, icon: 'error' });
+                            return;
+                        }
+                        if (!fechaNac) {
+                            Swal.fire('Fecha Obligatoria', `Introduce la fecha de nacimiento del Acompañante ${indexVisual}.`, 'warning');
+                            return;
+                        }
+
+                        const edadCalculada = calcularEdadExacta(fechaNac);
+
+                        if (!parentesco) {
+                            Swal.fire('Atención', `Selecciona el parentesco para el Acompañante ${indexVisual}.`, 'warning');
+                            return;
+                        }
+                        if (esExcepcion && !motivo) {
+                            Swal.fire('Atención', `Por favor, justifica el caso excepcional del Acompañante ${indexVisual}.`, 'warning');
+                            return;
+                        }
+
+                        listaParaUpsert.push({
+                            titular_dni: usuarioDni,
+                            numero_acompanante: numPosicion,
+                            nombre: nombre,
+                            apellidos: apellidos,
+                            dni: dni,
+                            parentesco: parentesco,
+                            es_excepcion: esExcepcion,
+                            motivo_excepcion: motivo,
+                            zona_discapacidad: requiereZonaAdaptada,
+                            fecha_nacimiento: fechaNac,
+                            edad_actual: edadCalculada,
+                            cedido_por_dni: null
+                        });
+                    }
                 }
             }
 
@@ -383,7 +456,7 @@
 
                 Swal.fire({
                     title: '¡Todo guardado!',
-                    text: 'Los acompañantes se han actualizado perfectamente.',
+                    text: 'Las invitaciones y cesiones se han procesado correctamente.',
                     icon: 'success',
                     confirmButtonColor: '#4f46e5'
                 }).then(() => location.reload());
