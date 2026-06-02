@@ -151,23 +151,17 @@
             const container = document.getElementById('lista-invitados');
             container.innerHTML = "";
 
-            // 1. Descargamos las invitaciones de mi propiedad
             const { data: mios } = await _supabase.from('invitados').select('*').eq('titular_dni', usuarioDni).order('numero_acompanante', { ascending: true });
-            
-            // 2. Descargamos las invitaciones que OTRAS personas me han cedido a mí
             const { data: cedidasAmi } = await _supabase.from('invitados').select('*').eq('cedido_por_dni', usuarioDni);
 
             const listadoMios = mios || [];
             const listadoCedidasAmi = cedidasAmi || [];
 
-            // Criba de pases base familiares propios
             const pasesBasePropios = listadoMios.filter(inv => inv.numero_acompanante <= 3);
 
-            // Marcar casilla de discapacidad propia
             const algunFamiliarDiscapacitado = pasesBasePropios.some(inv => !inv.cedido_por_dni && inv.zona_discapacidad === true);
             document.getElementById('check-discapacidad').checked = algunFamiliarDiscapacitado;
 
-            // Buscamos nombres de los dueños que me han cedido algo
             const dnisDuenos = [...new Set(listadoCedidasAmi.map(inv => inv.titular_dni).filter(Boolean))];
             const diccionarioNombres = {};
             if (dnisDuenos.length > 0) {
@@ -175,28 +169,21 @@
                 if (titularesDuenos) { titularesDuenos.forEach(t => { diccionarioNombres[t.dni] = `${t.nombre} ${t.apellido1}`; }); }
             }
 
-            // --- CORRECCIÓN INTEGRAL DE RANURAS EMISORAS ---
-            // Forzamos el bucle estricto de tus 3 ranuras reglamentarias
             for (let r = 1; r <= 3; r++) {
                 const registro = pasesBasePropios.find(m => m.numero_acompanante === r);
-                
                 if (registro) {
                     const estaCedidaAOtro = registro.cedido_por_dni && registro.cedido_por_dni !== "";
-                    // Si el registro existe y tiene un DNI asignado en la columna cedido, se pinta bloqueada en su ranura correspondiente
                     crearTarjetaEnPantalla(false, registro, r, estaCedidaAOtro);
                 } else {
-                    // Si verdaderamente no hay nada guardado en esa ranura base (libre), se pinta en blanco
                     crearTarjetaEnPantalla(false, null, r, false);
                 }
             }
 
-            // --- PINTAR LAS TARJETAS EXTRAS QUE LE HAN REGALADO A ÉL ---
             listadoCedidasAmi.forEach((inv, i) => {
                 const nombreDueno = diccionarioNombres[inv.titular_dni] || inv.titular_dni;
                 crearTarjetaEnPantalla(false, inv, 200 + i, false, nombreDueno, true);
             });
 
-            // --- PINTAR LAS EXCEPCIONES ---
             const excepciones = listadoMios.filter(m => m.numero_acompanante > 3);
             excepciones.forEach(inv => { crearTarjetaEnPantalla(true, inv, inv.numero_acompanante, false); });
 
@@ -217,6 +204,8 @@
             if (esPaseRecibido && datos) {
                 card.dataset.esPaseRecibido = "true";
                 card.dataset.duenoTablaId = datos.id; 
+                card.dataset.duenoOriginalDni = datos.titular_dni;
+                card.dataset.ranuraOriginalNum = datos.numero_acompanante;
             }
 
             const botonEliminar = esExcepcion ? `<button type="button" onclick="marcarComoEliminado(this)" class="text-red-500 font-bold text-xs bg-red-50 px-2 py-1 rounded-lg border border-red-200">Eliminar</button>` : '';
@@ -239,7 +228,11 @@
                    </div>`;
             }
 
-            // Ocultamos los datos familiares si la tarjeta ha sido cedida por el emisor actual
+            const nombreVisual = datos && datos.nombre !== "Pase Cedido" ? datos.nombre : "";
+            const apellidosVisual = datos && !datos.apellidos.startsWith("Por ") ? datos.apellidos : "";
+            const dniVisual = datos && datos.dni !== "CEDIDO" ? datos.dni : "";
+            const fechaNacVisual = datos && datos.fecha_nacimiento !== "2000-01-01" ? datos.fecha_nacimiento : "";
+
             card.innerHTML = `
                 <div class="flex justify-between items-center border-b pb-2 mb-2 ${esExcepcion ? 'border-amber-200' : 'border-gray-200'}">
                     <span class="titulo-tarjeta-prioridad text-xs uppercase font-extrabold tracking-wider ${esExcepcion ? 'text-amber-700' : 'text-gray-500'}">Acompañante --</span>
@@ -248,15 +241,15 @@
                 ${avisoCabecera}
                 ${bloqueCeder}
                 <div class="capa-datos-familiares grid grid-cols-1 gap-2 ${esBloqueoCedidaEmisor ? 'hidden' : ''}">
-                    <input type="text" placeholder="Nombre completo" class="inv-nombre w-full p-3 text-sm border rounded-lg focus:outline-none" value="${datos && !esBloqueoCedidaEmisor ? datos.nombre : ''}">
-                    <input type="text" placeholder="Apellidos" class="inv-apellidos w-full p-3 text-sm border rounded-lg focus:outline-none" value="${datos && !esBloqueoCedidaEmisor ? datos.apellidos : ''}">
-                    <input type="text" placeholder="DNI / NIE del acompañante" class="inv-dni w-full p-3 text-sm border rounded-lg uppercase focus:outline-none" value="${datos && !esBloqueoCedidaEmisor ? (datos.dni || '') : ''}">
+                    <input type="text" placeholder="Nombre completo" class="inv-nombre w-full p-3 text-sm border rounded-lg focus:outline-none" value="${nombreVisual}">
+                    <input type="text" placeholder="Apellidos" class="inv-apellidos w-full p-3 text-sm border rounded-lg focus:outline-none" value="${apellidosVisual}">
+                    <input type="text" placeholder="DNI / NIE del acompañante" class="inv-dni w-full p-3 text-sm border rounded-lg uppercase focus:outline-none" value="${dniVisual}">
                     <div>
                         <label class="block text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-1 ml-1">Fecha de Nacimiento</label>
-                        <input type="date" class="inv-fecha-nacimiento w-full p-3 text-sm border rounded-lg bg-white text-gray-700 focus:outline-none" value="${datos && !esBloqueoCedidaEmisor ? datos.fecha_nacimiento : ''}">
+                        <input type="date" class="inv-fecha-nacimiento w-full p-3 text-sm border rounded-lg bg-white text-gray-700 focus:outline-none" value="${fechaNacVisual}">
                     </div>
                     <select class="inv-parentesco w-full p-3 text-sm border rounded-lg bg-white focus:outline-none">
-                        <option value="" disabled ${!datos || esBloqueoCedidaEmisor ? 'selected' : ''}>Selecciona parentesco</option>
+                        <option value="" disabled ${!datos || esBloqueoCedidaEmisor || nombreVisual === '' ? 'selected' : ''}>Selecciona parentesco</option>
                         <option value="Pareja" ${datos && !esBloqueoCedidaEmisor && datos.parentesco === 'Pareja' ? 'selected' : ''}>Pareja</option>
                         <option value="Hijo/a" ${datos && !esBloqueoCedidaEmisor && datos.parentesco === 'Hijo/a' ? 'selected' : ''}>Hijo/a</option>
                         <option value="Padre/Madre" ${datos && !esBloqueoCedidaEmisor && datos.parentesco === 'Padre/Madre' ? 'selected' : ''}>Padre/Madre</option>
@@ -309,6 +302,8 @@
                 const esExcepcion = card.dataset.esExcepcion === "true";
                 const esPaseRecibido = card.dataset.esPaseRecibido === "true";
                 const filaIdUnica = card.dataset.duenoTablaId;
+                const duenoOriginalDni = card.dataset.duenoOriginalDni;
+                const ranuraOriginalNum = card.dataset.ranuraOriginalNum;
 
                 if (card.classList.contains('para-borrar')) {
                     if (!esPaseRecibido) {
@@ -343,7 +338,10 @@
                         zona_discapacidad: false, fecha_nacimiento: null, edad_actual: null, cedido_por_dni: dniBeneficiario
                     });
                 } else {
-                    if (!nombre && !apellidos && !dni && !fechaNac && !esPaseRecibido) continue;
+                    // CORRECCIÓN MAGISTRAL: Si la tarjeta recibida se deja completamente vacía, nos la saltamos de forma segura. No bloquea.
+                    if (!nombre && !apellidos && !dni && !fechaNac) {
+                        continue; 
+                    }
 
                     if (!nombre || !apellidos || !dni || !fechaNac || !parentesco) {
                         Swal.fire('Atención', `Completa todos los campos del Acompañante ${indexVisual}.`, 'warning'); return;
@@ -360,6 +358,9 @@
 
                     if (esPaseRecibido) {
                         modeloFila.id = parseInt(filaIdUnica);
+                        modeloFila.titular_dni = duenoOriginalDni;
+                        modeloFila.numero_acompanante = parseInt(ranuraOriginalNum);
+                        modeloFila.cedido_por_dni = usuarioDni; // Mantiene el vínculo
                         listaUpdatesCedidosRecibidos.push(modeloFila);
                     } else {
                         modeloFila.titular_dni = usuarioDni;
