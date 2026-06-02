@@ -16,17 +16,16 @@
         </header>
 
         <div id="pantalla-login" class="space-y-4">
-            <p class="text-center text-gray-600">Introduce tu DNI/NIE para acceder</p>
-            <input type="text" id="login-dni" placeholder="Ej: 12345678Z" class="w-full p-4 border-2 border-gray-300 rounded-xl uppercase font-semibold">
-            <button onclick="iniciarSesion()" class="w-full bg-indigo-600 text-white p-4 rounded-xl font-bold hover:bg-indigo-700">Acceder al Formulario</button>
+            <input type="text" id="login-dni" placeholder="DNI/NIE" class="w-full p-4 border rounded-xl uppercase font-semibold">
+            <button onclick="verificarAcceso()" class="w-full bg-indigo-600 text-white p-4 rounded-xl font-bold">Acceder</button>
         </div>
 
         <div id="pantalla-formulario" class="hidden space-y-6">
-            <h2 id="nombre-titular" class="font-bold text-lg text-gray-800"></h2>
+            <h2 id="nombre-titular" class="font-bold text-lg"></h2>
             <form id="form-invitados" onsubmit="guardarDatos(event)" class="space-y-4">
                 <div id="lista-invitados" class="space-y-4"></div>
-                <div class="bg-gray-50 p-4 rounded border"><input id="check-lopd" type="checkbox" class="mr-2"> Acepto la LOPD.</div>
-                <button type="submit" class="w-full bg-green-600 text-white p-4 rounded-xl font-bold hover:bg-green-700">Guardar Cambios</button>
+                <div class="bg-gray-50 p-4 rounded border"><input id="check-lopd" type="checkbox" class="mr-2"> Acepto LOPD.</div>
+                <button type="submit" class="w-full bg-green-600 text-white p-4 rounded-xl font-bold">Guardar</button>
             </form>
         </div>
     </div>
@@ -35,52 +34,43 @@
         const supabase = supabase.createClient('https://nebtkwgebbgenmlysnui.supabase.co', 'sb_publishable_zCd7omi4D9AK2rAXlTEvmw_UwKYo0d_');
         let usuarioDni = "";
 
-        // LOGIN
-        async function iniciarSesion() {
+        async function verificarAcceso() {
             usuarioDni = document.getElementById('login-dni').value.trim().toUpperCase();
-            if(!usuarioDni) return Swal.fire('Error', 'Introduce DNI', 'error');
-
             const { data: titular } = await supabase.from('titulares').select('*').eq('dni', usuarioDni).maybeSingle();
-            if(!titular) return Swal.fire('Error', 'DNI no encontrado', 'error');
-
+            if (!titular) return Swal.fire('Error', 'DNI no autorizado', 'error');
+            
             document.getElementById('nombre-titular').innerText = "Hola, " + titular.nombre;
             document.getElementById('pantalla-login').classList.add('hidden');
             document.getElementById('pantalla-formulario').classList.remove('hidden');
             cargarInvitados();
         }
 
-        // CARGAR
         async function cargarInvitados() {
             const container = document.getElementById('lista-invitados');
-            // Carga invitaciones propias (titular_dni) o las que le han cedido (cedido_por_dni)
-            const { data } = await supabase.from('invitados')
-                .select('*')
-                .or(`titular_dni.eq.${usuarioDni},cedido_por_dni.eq.${usuarioDni}`);
-            
             container.innerHTML = "";
+            const { data } = await supabase.from('invitados').select('*').or(`titular_dni.eq.${usuarioDni},cedido_por_dni.eq.${usuarioDni}`);
+            
             (data || []).forEach(inv => {
                 const esCedida = inv.cedido_por_dni === usuarioDni;
                 container.innerHTML += `
-                    <div class="p-4 border rounded-xl bg-white tarjeta-invitado" data-id="${inv.id}">
+                    <div class="p-4 border rounded-xl bg-white tarjeta-invitado" data-id="${inv.id}" data-cedido-por="${inv.cedido_por_dni || ''}">
                         <div class="flex justify-between text-xs mb-2 text-gray-500">
-                            <span>${esCedida ? '🎁 Invitación recibida' : 'Tu invitación'}</span>
-                            <label><input type="checkbox" class="check-ceder" onchange="toggleCeder(this)" ${inv.dni === 'CEDIDO' ? 'checked' : ''}> Ceder</label>
+                            <span>${esCedida ? '🎁 Invitación cedida a ti' : 'Tu invitación'}</span>
+                            <label><input type="checkbox" class="check-ceder" onchange="toggleCeder(this)" ${inv.nombre === 'CEDIDO' ? 'checked' : ''}> Ceder</label>
                         </div>
-                        <input type="text" class="nombre-input w-full border p-2 ${inv.dni === 'CEDIDO' ? 'hidden' : ''}" value="${inv.nombre || ''}" placeholder="Nombre completo">
-                        <input type="text" class="ceder-input w-full border p-2 ${inv.dni === 'CEDIDO' ? '' : 'hidden'}" value="${inv.apellidos || ''}" placeholder="DNI del compañero para ceder">
+                        <input type="text" class="nombre-input w-full border p-2 ${inv.nombre === 'CEDIDO' ? 'hidden' : ''}" value="${inv.nombre || ''}" placeholder="Nombre completo">
+                        <input type="text" class="ceder-input w-full border p-2 ${inv.nombre === 'CEDIDO' ? '' : 'hidden'}" value="${inv.apellidos || ''}" placeholder="DNI del compañero">
                     </div>
                 `;
             });
         }
 
-        // INTERACCIÓN
         function toggleCeder(el) {
             const card = el.closest('.tarjeta-invitado');
             card.querySelector('.nombre-input').classList.toggle('hidden', el.checked);
             card.querySelector('.ceder-input').classList.toggle('hidden', !el.checked);
         }
 
-        // GUARDADO
         async function guardarDatos(e) {
             e.preventDefault();
             Swal.fire({ title: 'Guardando...', didOpen: () => Swal.showLoading() });
@@ -89,21 +79,27 @@
             for(let card of tarjetas) {
                 const id = card.dataset.id;
                 const esCeder = card.querySelector('.check-ceder').checked;
-                const dniDestino = card.querySelector('.ceder-input').value.toUpperCase();
+                const dniDestino = card.querySelector('.ceder-input').value.trim().toUpperCase();
                 const nombre = card.querySelector('.nombre-input').value;
+                const cedidoPorDni = card.dataset.cedidoPor;
 
-                if(esCeder && dniDestino) {
-                    // Acción de ceder: actualizamos el destinatario y marcamos como cedido
+                // Caso 1: Desmarcas cesión (te arrepientes)
+                if (id && !esCeder && cedidoPorDni) {
+                    await supabase.from('invitados').delete().eq('id', id);
+                } 
+                // Caso 2: Cedes a un compañero
+                else if (esCeder && dniDestino) {
                     await supabase.from('invitados').upsert({
                         id: id || undefined,
                         titular_dni: dniDestino,
+                        cedido_por_dni: usuarioDni,
                         nombre: "CEDIDO",
                         apellidos: dniDestino,
-                        dni: "CEDIDO",
-                        cedido_por_dni: usuarioDni
+                        dni: "CEDIDO"
                     });
-                } else if(nombre) {
-                    // Guardado normal
+                } 
+                // Caso 3: Guardado normal
+                else if (nombre) {
                     await supabase.from('invitados').upsert({
                         id: id || undefined,
                         titular_dni: usuarioDni,
@@ -112,7 +108,7 @@
                     });
                 }
             }
-            Swal.fire('Guardado', 'Sincronizado', 'success').then(() => location.reload());
+            location.reload();
         }
     </script>
 </body>
