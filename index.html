@@ -282,8 +282,10 @@
                 ? `<span class="text-[10px] bg-emerald-200 text-emerald-800 font-bold px-2 py-0.5 rounded-lg capa-remitente-tag">Recibida de: ${datos?.cedido_por_dni || ''}</span>`
                 : (tipoTarjeta === "excepcional" ? `<span class="text-[10px] bg-amber-200 text-amber-800 font-bold px-2 py-0.5 rounded-lg">Pase Excepcional</span>` : '');
 
-            // SE SOLUCIONA LA RECARGA: Si no hay valor en la BD para el parentesco, se fuerza que se quede seleccionado el marcador neutro informativo
-            const parentescoActual = datos?.parentesco || "";
+            // CONTROL DEFENSIVO: Si viene null, vacío o "Otros" en una tarjeta sin nombre, se limpia para forzar el indicador neutro
+            const parentescoBBDD = datos?.parentesco || "";
+            const tieneNombreYApellidos = datos?.nombre && datos?.apellidos;
+            const parentescoActual = (parentescoBBDD === "Otros" && !tieneNombreYApellidos) ? "" : parentescoBBDD;
 
             card.innerHTML = `
                 <div class="flex justify-between items-center border-b pb-2 mb-2 ${tipoTarjeta === 'recibida' ? 'border-emerald-200' : (tipoTarjeta === 'excepcional' ? 'border-amber-200' : 'border-gray-200')}">
@@ -448,12 +450,12 @@
                         }
 
                         mapaContadoresExtrasPorCompanero[dniBeneficiario]++;
-                        constPlatformRanura = mapaContadoresExtrasPorCompanero[dniBeneficiario];
+                        const platformRanura = mapaContadoresExtrasPorCompanero[dniBeneficiario];
 
                         listaParaUpsert.push({
                             titular_dni: usuarioDni, 
                             numero_acompanante: numPosicion,     
-                            nombre: "", apellidos: "", dni: "CEDIDO", parentesco: "Otros",
+                            nombre: "", apellidos: "", dni: "CEDIDO", parentesco: null,
                             es_excepcion: false, motivo_excepcion: null,
                             zona_discapacidad: false, 
                             fecha_nacimiento: null, edad_actual: null,
@@ -462,8 +464,8 @@
 
                         listaParaUpsert.push({
                             titular_dni: dniBeneficiario, 
-                            numero_acompanante: constPlatformRanura,     
-                            nombre: "", apellidos: "", dni: null, parentesco: "Otros",
+                            numero_acompanante: platformRanura,     
+                            nombre: "", apellidos: "", dni: null, parentesco: null,
                             es_excepcion: false, motivo_excepcion: null,
                             zona_discapacidad: false, 
                             fecha_nacimiento: null, edad_actual: null,
@@ -475,11 +477,11 @@
                         const apellidos = card.querySelector('.inv-apellidos').value.trim();
                         const dni = card.querySelector('.inv-dni').value.trim().toUpperCase();
                         const fechaNac = card.querySelector('.inv-fecha-nacimiento').value;
-                        const parentesco = card.querySelector('.inv-parentesco').value || "Otros";
+                        const parentesco = card.querySelector('.inv-parentesco').value;
 
-                        // El gatillo inequívoco de que se está rellenando la tarjeta es que se escriba Nombre o Apellido
+                        // Se evalúa de manera estricta por texto escrito
                         if (nombre || apellidos) {
-                            if (!nombre || !apellidos || !dni || !fechaNac || !card.querySelector('.inv-parentesco').value) {
+                            if (!nombre || !apellidos || !dni || !fechaNac || !parentesco) {
                                 Swal.fire('Atención', `Por favor, completa todos los campos obligatorios del Acompañante ${indexVisual}.`, 'warning');
                                 return;
                             }
@@ -500,9 +502,10 @@
                                 cedido_por_dni: null
                             });
                         } else {
+                            // CORRECCIÓN CLAVE: Las ranuras base que se guarden vacías inyectan NULL en parentesco
                             listaParaUpsert.push({
                                 titular_dni: usuarioDni, numero_acompanante: numPosicion,
-                                nombre: null, apellidos: null, dni: null, parentesco: "Otros",
+                                nombre: null, apellidos: null, dni: null, parentesco: null,
                                 es_excepcion: false, motivo_excepcion: null, 
                                 zona_discapacidad: algunInvitadoRequiereMovilidad, 
                                 fecha_nacimiento: null, edad_actual: null, cedido_por_dni: null
@@ -518,7 +521,6 @@
                     const parentesco = card.querySelector('.inv-parentesco').value;
                     const motivo = tipoTarjeta === "excepcional" ? card.querySelector('.inv-motivo').value.trim() : null;
 
-                    // CORRECCIÓN DEFINITIVA: Ignoramos el valor por defecto del select "Otros". Solo valida si hay texto en Nombre/Apellido.
                     if (nombre || apellidos) {
                         if (!nombre || !apellidos || !dni || !fechaNac || !parentesco) {
                             Swal.fire('Atención', `Completa todos los campos obligatorios del formulario.`, 'warning');
