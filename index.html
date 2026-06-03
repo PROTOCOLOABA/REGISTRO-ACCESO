@@ -17,7 +17,6 @@
             <p class="text-indigo-200 text-sm mt-1">Confirmación y Gestión de Invitados</p>
         </header>
 
-        <!-- PANTALLA 1: LOGIN -->
         <div id="pantalla-login" class="p-6 flex-grow flex flex-col justify-center items-center">
             <div class="w-full space-y-4">
                 <div class="text-center mb-6">
@@ -33,7 +32,6 @@
             </div>
         </div>
 
-        <!-- PANTALLA 2: FORMULARIO -->
         <div id="pantalla-formulario" class="p-6 flex-grow hidden space-y-6">
             <div class="bg-indigo-50 p-4 rounded-xl border border-indigo-100">
                 <span class="text-xs uppercase font-bold text-indigo-500 tracking-wider">Titular Autorizado</span>
@@ -45,17 +43,14 @@
 
             <form id="form-invitados" onsubmit="guardarDatos(event)" class="space-y-6">
                 
-                <!-- CONTENEDOR DE TARJETAS DINÁMICAS (BASE, CEDIDAS Y EXCEPCIONALES) -->
                 <div id="lista-invitados" class="space-y-4"></div>
 
-                <!-- BOTONERA PARA INVITACIONES EXCEPCIONALES -->
                 <div class="flex justify-center pt-2">
                     <button type="button" onclick="crearTarjetaExcepcionalVacia()" class="w-full border-2 border-dashed border-amber-400 text-amber-800 bg-amber-50/60 font-bold p-3 rounded-xl flex items-center justify-center gap-2 hover:bg-amber-100 transition-colors text-sm shadow-sm">
                         <span>➕ Solicitar Caso Excepcional</span>
                     </button>
                 </div>
 
-                <!-- CASILLA GLOBAL PARA MOVILIDAD REDUCIDA -->
                 <div class="bg-blue-50 p-4 rounded-xl border border-blue-200 mt-4">
                     <div class="flex items-start">
                         <div class="flex items-center h-5">
@@ -70,7 +65,6 @@
                     </div>
                 </div>
 
-                <!-- CASILLA LEGAL LOPD -->
                 <div class="bg-gray-50 p-4 rounded-xl border border-gray-200">
                     <div class="flex items-start">
                         <div class="flex items-center h-5">
@@ -521,7 +515,7 @@
                     const parentesco = card.querySelector('.inv-parentesco').value;
                     const motivo = tipoTarjeta === "excepcional" ? card.querySelector('.inv-motivo').value.trim() : null;
 
-                    // CORRECCIÓN TÉCNICA: Solo exigimos obligatoriedad si se rellenan Nombre o Apellidos reales
+                    // Si el usuario ha rellenado activamente Nombre o Apellidos, validamos e insertamos
                     if (nombre || apellidos) {
                         if (!nombre || !apellidos || !dni || !fechaNac || !parentesco) {
                             Swal.fire('Atención', `Completa todos los campos obligatorios del formulario.`, 'warning');
@@ -554,22 +548,9 @@
                             fecha_nacimiento: fechaNac, edad_actual: edadCalculada,
                             cedido_por_dni: remitente
                         });
-                    } else {
-                        // Si la tarjeta cedida está en blanco, se conserva en Supabase sin alterarla
-                        if (tipoTarjeta === "recibida") {
-                            const badgeEl = card.querySelector('.capa-remitente-tag');
-                            let remitente = badgeEl ? badgeEl.innerText.replace('Recibida de: ', '') : null;
-                            
-                            listaParaUpsert.push({
-                                titular_dni: usuarioDni,
-                                numero_acompanante: numPosicion,
-                                nombre: null, apellidos: null, dni: null, parentesco: "Otros",
-                                es_excepcion: false, motivo_excepcion: null,
-                                zona_discapacidad: false, fecha_nacimiento: null, edad_actual: null,
-                                cedido_por_dni: remitente
-                            });
-                        }
-                    }
+                    } 
+                    // SOLUCIÓN AL FALLO: Si la tarjeta recibida está vacía, simplemente NO la añadimos a listaParaUpsert.
+                    // Al ignorarla, no machacamos el registro de Supabase y el código no se queda "pensando".
                 }
             }
 
