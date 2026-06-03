@@ -37,7 +37,7 @@
                 <span class="text-xs uppercase font-bold text-indigo-500 tracking-wider">Titular Autorizado</span>
                 <h2 id="nombre-titular" class="text-xl font-bold text-gray-800">Cargando...</h2>
                 <p class="text-xs text-gray-600 mt-2 font-medium leading-relaxed">
-                    Gestiona tus acompañantes por orden de prioridad. Las invitaciones que cedas quedarán bloqueadas. Si un miembro del grupo requiere movilidad reducida, todo tu bloque familiar será asignado a dicha zona para no separaros.
+                    Gestiona tus acompañantes por orden de prioridad. Las invitaciones que cedas quedarán bloqueadas. Si marcas movilidad reducida, afectará a toda tu unidad familiar activa.
                 </p>
             </div>
 
@@ -49,6 +49,20 @@
                     <button type="button" onclick="crearTarjetaExcepcionalVacia()" class="w-full border-2 border-dashed border-amber-400 text-amber-800 bg-amber-50/60 font-bold p-3 rounded-xl flex items-center justify-center gap-2 hover:bg-amber-100 transition-colors text-sm shadow-sm">
                         <span>➕ Solicitar Caso Excepcional</span>
                     </button>
+                </div>
+
+                <div class="bg-blue-50 p-4 rounded-xl border border-blue-200 mt-4">
+                    <div class="flex items-start">
+                        <div class="flex items-center h-5">
+                            <input id="check-discapacidad" type="checkbox" class="w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500 cursor-pointer">
+                        </div>
+                        <div class="ml-3 text-xs">
+                            <label for="check-discapacidad" class="font-bold text-blue-950 cursor-pointer select-none">
+                                ¿Algún miembro del grupo requiere acceso a la zona habilitada para personal con discapacidad/movilidad reducida?
+                            </label>
+                            <p class="text-blue-700 text-[11px] mt-0.5">Nota: Si se marca "Sí", se asignará pase a esta zona reservada para todo tu grupo familiar (no afectará a pases cedidos).</p>
+                        </div>
+                    </div>
                 </div>
 
                 <div class="bg-gray-50 p-4 rounded-xl border border-gray-200">
@@ -177,6 +191,10 @@
             const excepcionalesGuardadas = [];
 
             if (existentes && existentes.length > 0) {
+                // Al cargar, si CUALQUIERA de tus pases guardados tiene movilidad reducida, encendemos el check general
+                const algunDiscapacitado = existentes.some(inv => inv.zona_discapacidad === true);
+                document.getElementById('check-discapacidad').checked = algunDiscapacitado;
+
                 existentes.forEach(inv => {
                     if (inv.numero_acompanante <= 3) {
                         mapaPropios[inv.numero_acompanante] = inv;
@@ -297,17 +315,10 @@
                         <option value="Otros" ${datos && datos.parentesco === 'Otros' ? 'selected' : ''}>Otro</option>
                     </select>
 
-                    <div class="pt-2 border-t border-gray-100 flex items-center">
-                        <label class="flex items-center gap-2 text-xs font-bold text-gray-700 cursor-pointer select-none">
-                            <input type="checkbox" class="inv-discapacidad w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500 cursor-pointer" ${datos?.zona_discapacidad ? 'checked' : ''}>
-                            ♿ Requiere acceso a la zona habilitada para movilidad reducida
-                        </label>
-                    </div>
-
                     ${tipoTarjeta === "excepcional" ? `
                         <div class="mt-1">
                             <label class="block text-[11px] font-bold text-amber-800 uppercase tracking-wider mb-1 ml-1">Justificación del Caso Excepcional</label>
-                            <textarea placeholder="Explica detalladamente el caso (Ej: hermano menor de edad)..." class="inv-motivo w-full p-3 text-xs border border-amber-300 rounded-lg bg-white focus:outline-none" rows="2">${datos ? (datos.motivo_excepcion || '') : ''}</textarea>
+                            <textarea placeholder="Explica el caso..." class="inv-motivo w-full p-3 text-xs border border-amber-300 rounded-lg bg-white focus:outline-none" rows="2">${datos ? (datos.motivo_excepcion || '') : ''}</textarea>
                         </div>
                     ` : ''}
                 </div>
@@ -370,29 +381,15 @@
                 return;
             }
 
-            const tarjetas = document.querySelectorAll('.tarjeta-dinamica');
-            
-            // ESCANEO DE ARRASTRE FAMILIAR (Filtrando estrictamente para que NO lea las tarjetas que vas a ceder)
-            let algunInvitadoRequiereMovilidad = false;
-            for (let card of tarjetas) {
-                if (card.classList.contains('para-borrar-excepcion') || card.dataset.estaBloqueada === "true") continue;
-                
-                const checkCeder = card.querySelector('.check-ceder-entrada');
-                // Si la tarjeta NO se va a ceder, evaluamos su check de movilidad
-                if (!checkCeder || !checkCeder.checked) {
-                    const checkMovilidad = card.querySelector('.inv-discapacidad');
-                    if (checkMovilidad && checkMovilidad.checked) {
-                        algunInvitadoRequiereMovilidad = true;
-                        break;
-                    }
-                }
-            }
+            // Leemos el check genérico inferior que controla a toda tu unidad activa
+            const requiereZonaAdaptadaGrupo = document.getElementById('check-discapacidad').checked;
 
+            const tarjetas = document.querySelectorAll('.tarjeta-dinamica');
             const listaParaUpsert = [];
             const idsExcepcionalesParaBorrar = [];
             const mapaContadoresExtrasPorCompanero = {};
 
-            Swal.fire({ title: 'Sincronizando pases individuales...', didOpen: () => Swal.showLoading(), allowOutsideClick: false });
+            Swal.fire({ title: 'Guardando asignaciones familiares...', didOpen: () => Swal.showLoading(), allowOutsideClick: false });
 
             let indexVisual = 0;
 
@@ -450,7 +447,7 @@
                         mapaContadoresExtrasPorCompanero[dniBeneficiario]++;
                         const siguienteRanuraLibreCompanero = mapaContadoresExtrasPorCompanero[dniBeneficiario];
 
-                        // Registro 1: Congelación local en tu cuenta emisor
+                        // Inyección 1: Congelación en tu panel emisor
                         listaParaUpsert.push({
                             titular_dni: usuarioDni, 
                             numero_acompanante: numPosicion,     
@@ -461,20 +458,20 @@
                             cedido_por_dni: dniBeneficiario
                         });
 
-                        // SOLUCIÓN AL PROBLEMA: Forzamos estrictamente que la copia limpia para el receptor 
-                        // vaya con zona_discapacidad en FALSE de forma nativa a priori, liberada de tu arrastre de grupo.
+                        // Inyección 2: LA CLAVE. Pasa a la cuenta de tu compañero receptor de forma 100% LIMPIA.
+                        // Va forzada con zona_discapacidad en FALSE independientemente de lo que tú hayas marcado abajo.
                         listaParaUpsert.push({
                             titular_dni: dniBeneficiario, 
                             numero_acompanante: siguienteRanuraLibreCompanero,     
                             nombre: "", apellidos: "", dni: null, parentesco: "Otros",
                             es_excepcion: false, motivo_excepcion: null,
-                            zona_discapacidad: false, // <--- TOTALMENTE LIMPIA DE ORIGEN
+                            zona_discapacidad: false, // <--- Limpia a priori
                             fecha_nacimiento: null, edad_actual: null,
                             cedido_por_dni: usuarioDni
                         });
 
                     } else {
-                        // Flujo normal de tus acompañantes base activos
+                        // Flujo normal de tus acompañantes base activos que van ligados al check inferior genérico
                         const nombre = card.querySelector('.inv-nombre').value.trim();
                         const apellidos = card.querySelector('.inv-apellidos').value.trim();
                         const dni = card.querySelector('.inv-dni').value.trim().toUpperCase();
@@ -498,7 +495,7 @@
                                 numero_acompanante: numPosicion,
                                 nombre: nombre, apellidos: apellidos, dni: dni, parentesco: parentesco,
                                 es_excepcion: false, motivo_excepcion: null,
-                                zona_discapacidad: algunInvitadoRequiereMovilidad, 
+                                zona_discapacidad: requiereZonaAdaptadaGrupo, // Toma el valor genérico inferior
                                 fecha_nacimiento: fechaNac, edad_actual: edadCalculada,
                                 cedido_por_dni: null
                             });
@@ -506,7 +503,8 @@
                             listaParaUpsert.push({
                                 titular_dni: usuarioDni, numero_acompanante: numPosicion,
                                 nombre: null, apellidos: null, dni: null, parentesco: "Otros",
-                                es_excepcion: false, motivo_excepcion: null, zona_discapacidad: false,
+                                es_excepcion: false, motivo_excepcion: null, 
+                                zona_discapacidad: requiereZonaAdaptadaGrupo, // Sincroniza el bloque
                                 fecha_nacimiento: null, edad_actual: null, cedido_por_dni: null
                             });
                         }
@@ -548,15 +546,13 @@
                             nombre: nombre, apellidos: apellidos, dni: dni, parentesco: parentesco,
                             es_excepcion: (tipoTarjeta === "excepcional"), 
                             motivo_excepcion: motivo,
-                            zona_discapacidad: algunInvitadoRequiereMovilidad, 
+                            zona_discapacidad: requiereZonaAdaptadaGrupo, // Ligado a tu bloque familiar activo
                             fecha_nacimiento: fechaNac, edad_actual: edadCalculada,
                             cedido_por_dni: remitente
                         });
                     }
                 }
             }
-
-            Swal.fire({ title: 'Guardando en el servidor...', didOpen: () => Swal.showLoading(), allowOutsideClick: false });
 
             try {
                 if (idsExcepcionalesParaBorrar.length > 0) {
@@ -578,9 +574,7 @@
 
                 Swal.fire({
                     title: '¡Todo guardado!',
-                    text: algunInvitadoRequiereMovilidad 
-                        ? 'Lista confirmada. Al requerir uno de tus invitados zona adaptada, tu bloque familiar se ha reubicado de forma conjunta. Los pases cedidos han sido transferidos limpios.'
-                        : 'Los pases y cesiones se han procesado correctamente.',
+                    text: 'Los pases de tu bloque familiar activo y las cesiones se han sincronizado con éxito.',
                     icon: 'success',
                     confirmButtonColor: '#4f46e5'
                 }).then(() => {
