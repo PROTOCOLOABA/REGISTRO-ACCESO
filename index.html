@@ -37,7 +37,7 @@
                 <span class="text-xs uppercase font-bold text-indigo-500 tracking-wider">Titular Autorizado</span>
                 <h2 id="nombre-titular" class="text-xl font-bold text-gray-800">Cargando...</h2>
                 <p class="text-xs text-gray-600 mt-2 font-medium leading-relaxed">
-                    Gestiona tus acompañantes por orden de prioridad. Las invitaciones que cedas quedarán bloqueadas en tu panel. Puedes solicitar pases excepcionales si fuera necesario.
+                    Gestiona tus acompañantes por orden de prioridad. Las invitaciones que cedas quedarán bloqueadas. Si un miembro del grupo requiere movilidad reducida, todo tu bloque familiar será asignado a dicha zona para no separaros.
                 </p>
             </div>
 
@@ -49,20 +49,6 @@
                     <button type="button" onclick="crearTarjetaExcepcionalVacia()" class="w-full border-2 border-dashed border-amber-400 text-amber-800 bg-amber-50/60 font-bold p-3 rounded-xl flex items-center justify-center gap-2 hover:bg-amber-100 transition-colors text-sm shadow-sm">
                         <span>➕ Solicitar Caso Excepcional</span>
                     </button>
-                </div>
-
-                <div class="bg-blue-50 p-4 rounded-xl border border-blue-200 mt-4">
-                    <div class="flex items-start">
-                        <div class="flex items-center h-5">
-                            <input id="check-discapacidad" type="checkbox" class="w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500 cursor-pointer">
-                        </div>
-                        <div class="ml-3 text-xs">
-                            <label for="check-discapacidad" class="font-bold text-blue-950 cursor-pointer select-none">
-                                ¿Algún miembro del grupo requiere acceso a la zona habilitada para personal con discapacidad/movilidad reducida?
-                            </label>
-                            <p class="text-blue-700 text-[11px] mt-0.5">Nota: Si se marca "Sí", se asignará pase a esta zona reservada para todo el grupo familiar.</p>
-                        </div>
-                    </div>
                 </div>
 
                 <div class="bg-gray-50 p-4 rounded-xl border border-gray-200">
@@ -180,7 +166,6 @@
             const container = document.getElementById('lista-invitados');
             container.innerHTML = "";
 
-            // Buscamos pases propios, bloqueados por cesión y pases extras asignados a este DNI
             const { data: existentes } = await _supabase
                 .from('invitados')
                 .select('*')
@@ -192,20 +177,14 @@
             const excepcionalesGuardadas = [];
 
             if (existentes && existentes.length > 0) {
-                const algunDiscapacitado = existentes.some(inv => inv.zona_discapacidad === true);
-                document.getElementById('check-discapacidad').checked = algunDiscapacitado;
-
                 existentes.forEach(inv => {
                     if (inv.numero_acompanante <= 3) {
-                        // Tarjetas de control nativo propias
                         mapaPropios[inv.numero_acompanante] = inv;
                     } 
                     else if (inv.numero_acompanante > 100 && inv.numero_acompanante < 1000) {
-                        // Tarjetas de pases extras recibidos de otros compañeros
                         recibidosExtras.push(inv);
                     }
                     else if (inv.numero_acompanante >= 1000) {
-                        // Casos excepcionales propios
                         excepcionalesGuardadas.push(inv);
                         if (inv.numero_acompanante > maxRanuraExcepcionales) {
                             maxRanuraExcepcionales = inv.numero_acompanante;
@@ -214,18 +193,15 @@
                 });
             }
 
-            // 1. Pintamos de forma estricta los 3 pases reglamentarios
             for (let i = 1; i <= 3; i++) {
                 const datosInvitado = mapaPropios[i] || null;
                 crearTarjetaEnPantalla(datosInvitado, i, "propia");
             }
 
-            // 2. Pintamos las tarjetas extras que hayamos RECIBIDO de compañeros
             recibidosExtras.forEach(invCedido => {
                 crearTarjetaEnPantalla(invCedido, invCedido.numero_acompanante, "recibida");
             });
 
-            // 3. Pintamos las excepcionales ya guardadas
             excepcionalesGuardadas.forEach(invExcep => {
                 crearTarjetaEnPantalla(invExcep, invExcep.numero_acompanante, "excepcional");
             });
@@ -265,8 +241,8 @@
                 if (yaCedidaHaciaAfuera) {
                     bloqueCeder = `
                         <div class="bg-amber-100/70 p-3 rounded-lg border border-amber-200 text-xs font-bold text-amber-900 flex flex-col gap-1">
-                            <span>🔒 Pase Bloqueado</span>
-                            <span class="font-normal text-amber-700">Has cedido esta invitación reglamentaria al compañero con DNI: <span class="font-mono font-bold text-indigo-900">${datos.cedido_por_dni}</span>.</span>
+                            <span>🔒 Pase Cedido y Congelado</span>
+                            <span class="font-normal text-amber-700">Has transferido este pase al compañero con DNI: <span class="font-mono font-bold text-indigo-900">${datos.cedido_por_dni}</span>.</span>
                         </div>
                     `;
                 } else {
@@ -285,7 +261,6 @@
                 }
             }
 
-            // Si es una tarjeta que este usuario visualiza porque se la cedieron, extraemos el remitente de la BD
             const badgeCabecera = tipoTarjeta === "recibida" 
                 ? `<span class="text-[10px] bg-emerald-200 text-emerald-800 font-bold px-2 py-0.5 rounded-lg capa-remitente-tag">Recibida de: ${datos?.cedido_por_dni || ''}</span>`
                 : (tipoTarjeta === "excepcional" ? `<span class="text-[10px] bg-amber-200 text-amber-800 font-bold px-2 py-0.5 rounded-lg">Pase Excepcional</span>` : '');
@@ -304,16 +279,16 @@
                 ${bloqueCeder}
 
                 <div class="capa-datos-familiares grid grid-cols-1 gap-2 ${yaCedidaHaciaAfuera ? 'hidden' : ''}">
-                    <input type="text" placeholder="Nombre completo" class="inv-nombre w-full p-3 text-sm border rounded-lg focus:outline-none" value="${datos ? (datos.nombre || '') : ''}" ${yaCedidaHaciaAfuera ? 'disabled' : ''}>
-                    <input type="text" placeholder="Apellidos" class="inv-apellidos w-full p-3 text-sm border rounded-lg focus:outline-none" value="${datos ? (datos.apellidos || '') : ''}" ${yaCedidaHaciaAfuera ? 'disabled' : ''}>
-                    <input type="text" placeholder="DNI / NIE del acompañante" class="inv-dni w-full p-3 text-sm border rounded-lg uppercase focus:outline-none" value="${datos && datos.dni !== 'CEDIDO' ? (datos.dni || '') : ''}" ${yaCedidaHaciaAfuera ? 'disabled' : ''}>
+                    <input type="text" placeholder="Nombre completo" class="inv-nombre w-full p-3 text-sm border rounded-lg focus:outline-none" value="${datos ? (datos.nombre || '') : ''}">
+                    <input type="text" placeholder="Apellidos" class="inv-apellidos w-full p-3 text-sm border rounded-lg focus:outline-none" value="${datos ? (datos.apellidos || '') : ''}">
+                    <input type="text" placeholder="DNI / NIE del acompañante" class="inv-dni w-full p-3 text-sm border rounded-lg uppercase focus:outline-none" value="${datos && datos.dni !== 'CEDIDO' ? (datos.dni || '') : ''}">
                     
                     <div>
                         <label class="block text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-1 ml-1">Fecha de Nacimiento</label>
-                        <input type="date" class="inv-fecha-nacimiento w-full p-3 text-sm border rounded-lg bg-white focus:outline-none text-gray-700" value="${datos ? (datos.fecha_nacimiento || '') : ''}" ${yaCedidaHaciaAfuera ? 'disabled' : ''}>
+                        <input type="date" class="inv-fecha-nacimiento w-full p-3 text-sm border rounded-lg bg-white focus:outline-none text-gray-700" value="${datos ? (datos.fecha_nacimiento || '') : ''}">
                     </div>
 
-                    <select class="inv-parentesco w-full p-3 text-sm border rounded-lg bg-white focus:outline-none" ${yaCedidaHaciaAfuera ? 'disabled' : ''}>
+                    <select class="inv-parentesco w-full p-3 text-sm border rounded-lg bg-white focus:outline-none">
                         <option value="" disabled ${!datos ? 'selected' : ''}>Selecciona parentesco</option>
                         <option value="Pareja" ${datos && datos.parentesco === 'Pareja' ? 'selected' : ''}>Pareja</option>
                         <option value="Hijo/a" ${datos && datos.parentesco === 'Hijo/a' ? 'selected' : ''}>Hijo/a</option>
@@ -322,10 +297,17 @@
                         <option value="Otros" ${datos && datos.parentesco === 'Otros' ? 'selected' : ''}>Otro</option>
                     </select>
 
+                    <div class="pt-2 border-t border-gray-100 flex items-center">
+                        <label class="flex items-center gap-2 text-xs font-bold text-gray-700 cursor-pointer select-none">
+                            <input type="checkbox" class="inv-discapacidad w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500 cursor-pointer" ${datos?.zona_discapacidad ? 'checked' : ''}>
+                            ♿ Requiere acceso a la zona habilitada para movilidad reducida
+                        </label>
+                    </div>
+
                     ${tipoTarjeta === "excepcional" ? `
                         <div class="mt-1">
                             <label class="block text-[11px] font-bold text-amber-800 uppercase tracking-wider mb-1 ml-1">Justificación del Caso Excepcional</label>
-                            <textarea placeholder="Explica detalladamente el caso (Ej: hermano menor de edad)..." class="inv-motivo w-full p-3 text-xs border border-amber-300 rounded-lg bg-white focus:outline-none" rows="2" ${yaCedidaHaciaAfuera ? 'disabled' : ''}>${datos ? (datos.motivo_excepcion || '') : ''}</textarea>
+                            <textarea placeholder="Explica detalladamente el caso (Ej: hermano menor de edad)..." class="inv-motivo w-full p-3 text-xs border border-amber-300 rounded-lg bg-white focus:outline-none" rows="2">${datos ? (datos.motivo_excepcion || '') : ''}</textarea>
                         </div>
                     ` : ''}
                 </div>
@@ -388,17 +370,29 @@
                 return;
             }
 
-            const requiereZonaAdaptada = document.getElementById('check-discapacidad').checked;
             const tarjetas = document.querySelectorAll('.tarjeta-dinamica');
+            
+            // ESCANEO DE ARRASTRE FAMILIAR (Filtrando estrictamente para que NO lea las tarjetas que vas a ceder)
+            let algunInvitadoRequiereMovilidad = false;
+            for (let card of tarjetas) {
+                if (card.classList.contains('para-borrar-excepcion') || card.dataset.estaBloqueada === "true") continue;
+                
+                const checkCeder = card.querySelector('.check-ceder-entrada');
+                // Si la tarjeta NO se va a ceder, evaluamos su check de movilidad
+                if (!checkCeder || !checkCeder.checked) {
+                    const checkMovilidad = card.querySelector('.inv-discapacidad');
+                    if (checkMovilidad && checkMovilidad.checked) {
+                        algunInvitadoRequiereMovilidad = true;
+                        break;
+                    }
+                }
+            }
+
             const listaParaUpsert = [];
             const idsExcepcionalesParaBorrar = [];
-
-            // LA SOLUCIÓN TÉCNICA CRÍTICA:
-            // Almacenamos de antemano cuántas invitaciones extras de ranura alta (>100)
-            // ya existen asignadas a CADA compañero en Supabase, para realizar una auto-secuencia limpia en memoria
             const mapaContadoresExtrasPorCompanero = {};
 
-            Swal.fire({ title: 'Analizando asignaciones...', didOpen: () => Swal.showLoading(), allowOutsideClick: false });
+            Swal.fire({ title: 'Sincronizando pases individuales...', didOpen: () => Swal.showLoading(), allowOutsideClick: false });
 
             let indexVisual = 0;
 
@@ -436,7 +430,6 @@
                             return;
                         }
 
-                        // Averiguamos dinámicamente cuál es la siguiente ranura extra disponible del beneficiario
                         if (!mapaContadoresExtrasPorCompanero[dniBeneficiario]) {
                             const { data: extExistentes } = await _supabase
                                 .from('invitados')
@@ -454,31 +447,34 @@
                             mapaContadoresExtrasPorCompanero[dniBeneficiario] = maxRanuraActual;
                         }
 
-                        // Incrementamos secuencialmente (101, 102, 103, 104, 105...) de forma segura e ilimitada
                         mapaContadoresExtrasPorCompanero[dniBeneficiario]++;
                         const siguienteRanuraLibreCompanero = mapaContadoresExtrasPorCompanero[dniBeneficiario];
 
-                        // Inyección 1: Bloqueo en tu cuenta (ranura 1, 2 o 3)
+                        // Registro 1: Congelación local en tu cuenta emisor
                         listaParaUpsert.push({
                             titular_dni: usuarioDni, 
                             numero_acompanante: numPosicion,     
                             nombre: "", apellidos: "", dni: "CEDIDO", parentesco: "Otros",
                             es_excepcion: false, motivo_excepcion: null,
-                            zona_discapacidad: requiereZonaAdaptada, fecha_nacimiento: null, edad_actual: null,
+                            zona_discapacidad: false, 
+                            fecha_nacimiento: null, edad_actual: null,
                             cedido_por_dni: dniBeneficiario
                         });
 
-                        // Inyección 2: Copia limpia en el panel del compañero sin pisar a nadie (secuencia dinámica pura)
+                        // SOLUCIÓN AL PROBLEMA: Forzamos estrictamente que la copia limpia para el receptor 
+                        // vaya con zona_discapacidad en FALSE de forma nativa a priori, liberada de tu arrastre de grupo.
                         listaParaUpsert.push({
                             titular_dni: dniBeneficiario, 
                             numero_acompanante: siguienteRanuraLibreCompanero,     
                             nombre: "", apellidos: "", dni: null, parentesco: "Otros",
                             es_excepcion: false, motivo_excepcion: null,
-                            zona_discapacidad: requiereZonaAdaptada, fecha_nacimiento: null, edad_actual: null,
+                            zona_discapacidad: false, // <--- TOTALMENTE LIMPIA DE ORIGEN
+                            fecha_nacimiento: null, edad_actual: null,
                             cedido_por_dni: usuarioDni
                         });
 
                     } else {
+                        // Flujo normal de tus acompañantes base activos
                         const nombre = card.querySelector('.inv-nombre').value.trim();
                         const apellidos = card.querySelector('.inv-apellidos').value.trim();
                         const dni = card.querySelector('.inv-dni').value.trim().toUpperCase();
@@ -502,14 +498,15 @@
                                 numero_acompanante: numPosicion,
                                 nombre: nombre, apellidos: apellidos, dni: dni, parentesco: parentesco,
                                 es_excepcion: false, motivo_excepcion: null,
-                                zona_discapacidad: requiereZonaAdaptada, fecha_nacimiento: fechaNac, edad_actual: edadCalculada,
+                                zona_discapacidad: algunInvitadoRequiereMovilidad, 
+                                fecha_nacimiento: fechaNac, edad_actual: edadCalculada,
                                 cedido_por_dni: null
                             });
                         } else {
                             listaParaUpsert.push({
                                 titular_dni: usuarioDni, numero_acompanante: numPosicion,
                                 nombre: null, apellidos: null, dni: null, parentesco: "Otros",
-                                es_excepcion: false, motivo_excepcion: null, zona_discapacidad: requiereZonaAdaptada,
+                                es_excepcion: false, motivo_excepcion: null, zona_discapacidad: false,
                                 fecha_nacimiento: null, edad_actual: null, cedido_por_dni: null
                             });
                         }
@@ -551,7 +548,8 @@
                             nombre: nombre, apellidos: apellidos, dni: dni, parentesco: parentesco,
                             es_excepcion: (tipoTarjeta === "excepcional"), 
                             motivo_excepcion: motivo,
-                            zona_discapacidad: requiereZonaAdaptada, fecha_nacimiento: fechaNac, edad_actual: edadCalculada,
+                            zona_discapacidad: algunInvitadoRequiereMovilidad, 
+                            fecha_nacimiento: fechaNac, edad_actual: edadCalculada,
                             cedido_por_dni: remitente
                         });
                     }
@@ -580,7 +578,9 @@
 
                 Swal.fire({
                     title: '¡Todo guardado!',
-                    text: 'Los pases reglamentarios, cesiones y casos excepcionales se han sincronizado con éxito.',
+                    text: algunInvitadoRequiereMovilidad 
+                        ? 'Lista confirmada. Al requerir uno de tus invitados zona adaptada, tu bloque familiar se ha reubicado de forma conjunta. Los pases cedidos han sido transferidos limpios.'
+                        : 'Los pases y cesiones se han procesado correctamente.',
                     icon: 'success',
                     confirmButtonColor: '#4f46e5'
                 }).then(() => {
