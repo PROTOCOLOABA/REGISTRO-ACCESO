@@ -95,7 +95,7 @@
         const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
         let usuarioDni = "";
-        let maxRanuraExcepcionales = 1000; // Índice de control para pases excepcionales en la BD (>= 1000)
+        let maxRanuraExcepcionales = 1000;
 
         function validarDniNie(documento) {
             const regex = /^[XYZ\d]\d{7}[A-Z]$/i;
@@ -180,11 +180,11 @@
             const container = document.getElementById('lista-invitados');
             container.innerHTML = "";
 
-            // Buscamos tus invitaciones propias, las cedidas y las excepcionales
+            // Buscamos pases propios, bloqueados por cesión y pases extras asignados a este DNI
             const { data: existentes } = await _supabase
                 .from('invitados')
                 .select('*')
-                .or(`titular_dni.eq.${usuarioDni},cedido_por_dni.eq.${usuarioDni}`)
+                .or(`titular_dni.eq.${usuarioDni}`)
                 .order('numero_acompanante', { ascending: true });
 
             const mapaPropios = {};
@@ -196,13 +196,16 @@
                 document.getElementById('check-discapacidad').checked = algunDiscapacitado;
 
                 existentes.forEach(inv => {
-                    if (inv.titular_dni === usuarioDni && inv.numero_acompanante <= 3) {
+                    if (inv.numero_acompanante <= 3) {
+                        // Tarjetas de control nativo propias
                         mapaPropios[inv.numero_acompanante] = inv;
                     } 
-                    else if (inv.titular_dni === usuarioDni && inv.numero_acompanante > 100 && inv.numero_acompanante < 1000) {
+                    else if (inv.numero_acompanante > 100 && inv.numero_acompanante < 1000) {
+                        // Tarjetas de pases extras recibidos de otros compañeros
                         recibidosExtras.push(inv);
                     }
-                    else if (inv.titular_dni === usuarioDni && inv.numero_acompanante >= 1000) {
+                    else if (inv.numero_acompanante >= 1000) {
+                        // Casos excepcionales propios
                         excepcionalesGuardadas.push(inv);
                         if (inv.numero_acompanante > maxRanuraExcepcionales) {
                             maxRanuraExcepcionales = inv.numero_acompanante;
@@ -217,12 +220,12 @@
                 crearTarjetaEnPantalla(datosInvitado, i, "propia");
             }
 
-            // 2. Pintamos las tarjetas extras que hayamos RECIBIDO
+            // 2. Pintamos las tarjetas extras que hayamos RECIBIDO de compañeros
             recibidosExtras.forEach(invCedido => {
                 crearTarjetaEnPantalla(invCedido, invCedido.numero_acompanante, "recibida");
             });
 
-            // 3. Pintamos las excepcionales ya guardadas con anterioridad
+            // 3. Pintamos las excepcionales ya guardadas
             excepcionalesGuardadas.forEach(invExcep => {
                 crearTarjetaEnPantalla(invExcep, invExcep.numero_acompanante, "excepcional");
             });
@@ -241,7 +244,6 @@
             
             const yaCedidaHaciaAfuera = tipoTarjeta === "propia" && datos && datos.cedido_por_dni && datos.cedido_por_dni !== "" && datos.dni === "CEDIDO";
 
-            // Asignación estricta de clases css de interfaz según tipo de pase
             if (tipoTarjeta === "excepcional") {
                 card.className = "p-4 rounded-xl border-2 shadow-sm relative space-y-3 tarjeta-dinamica border-amber-300 bg-amber-50/50";
             } else if (tipoTarjeta === "recibida") {
@@ -283,8 +285,9 @@
                 }
             }
 
-            const badgeCabecera = tipoTarjeta === "recibida" 
-                ? `<span class="text-[10px] bg-emerald-200 text-emerald-800 font-bold px-2 py-0.5 rounded-lg">Recibida de: ${datos?.cedido_por_dni || ''}</span>`
+            // Si es una tarjeta que este usuario visualiza porque se la cedieron, extraemos el remitente de la BD
+            const badgeCabecera = tipoTarjeta === "recibida" 
+                ? `<span class="text-[10px] bg-emerald-200 text-emerald-800 font-bold px-2 py-0.5 rounded-lg capa-remitente-tag">Recibida de: ${datos?.cedido_por_dni || ''}</span>`
                 : (tipoTarjeta === "excepcional" ? `<span class="text-[10px] bg-amber-200 text-amber-800 font-bold px-2 py-0.5 rounded-lg">Pase Excepcional</span>` : '');
 
             card.innerHTML = `
@@ -347,7 +350,6 @@
 
         function eliminarTarjetaExcepcional(btn) {
             const card = btn.closest('.tarjeta-dinamica');
-            // Si ya estaba guardada en Supabase, la marcamos para purgar físicamente en el flujo de guardado
             card.classList.add('hidden', 'para-borrar-excepcion');
             reordenarTitulosVisuales();
         }
@@ -391,6 +393,13 @@
             const listaParaUpsert = [];
             const idsExcepcionalesParaBorrar = [];
 
+            // LA SOLUCIÓN TÉCNICA CRÍTICA:
+            // Almacenamos de antemano cuántas invitaciones extras de ranura alta (>100)
+            // ya existen asignadas a CADA compañero en Supabase, para realizar una auto-secuencia limpia en memoria
+            const mapaContadoresExtrasPorCompanero = {};
+
+            Swal.fire({ title: 'Analizando asignaciones...', didOpen: () => Swal.showLoading(), allowOutsideClick: false });
+
             let indexVisual = 0;
 
             for (let card of tarjetas) {
@@ -398,7 +407,6 @@
                 const tipoTarjeta = card.dataset.tipoTarjeta;
                 const estaBloqueada = card.dataset.estaBloqueada === "true";
 
-                // Si fue marcada para eliminar, la mandamos al listado de borrados físicos
                 if (card.classList.contains('para-borrar-excepcion')) {
                     idsExcepcionalesParaBorrar.push(numPosicion);
                     continue;
@@ -428,7 +436,29 @@
                             return;
                         }
 
-                        // Inyección 1: Bloqueo persistente en tu panel
+                        // Averiguamos dinámicamente cuál es la siguiente ranura extra disponible del beneficiario
+                        if (!mapaContadoresExtrasPorCompanero[dniBeneficiario]) {
+                            const { data: extExistentes } = await _supabase
+                                .from('invitados')
+                                .select('numero_acompanante')
+                                .eq('titular_dni', dniBeneficiario)
+                                .gt('numero_acompanante', 100)
+                                .lt('numero_acompanante', 1000);
+                            
+                            let maxRanuraActual = 100;
+                            if (extExistentes && extExistentes.length > 0) {
+                                extExistentes.forEach(e => {
+                                    if (e.numero_acompanante > maxRanuraActual) maxRanuraActual = e.numero_acompanante;
+                                });
+                            }
+                            mapaContadoresExtrasPorCompanero[dniBeneficiario] = maxRanuraActual;
+                        }
+
+                        // Incrementamos secuencialmente (101, 102, 103, 104, 105...) de forma segura e ilimitada
+                        mapaContadoresExtrasPorCompanero[dniBeneficiario]++;
+                        const siguienteRanuraLibreCompanero = mapaContadoresExtrasPorCompanero[dniBeneficiario];
+
+                        // Inyección 1: Bloqueo en tu cuenta (ranura 1, 2 o 3)
                         listaParaUpsert.push({
                             titular_dni: usuarioDni, 
                             numero_acompanante: numPosicion,     
@@ -438,10 +468,10 @@
                             cedido_por_dni: dniBeneficiario
                         });
 
-                        // Inyección 2: Ranura limpia asignada a tu compañero (>100)
+                        // Inyección 2: Copia limpia en el panel del compañero sin pisar a nadie (secuencia dinámica pura)
                         listaParaUpsert.push({
                             titular_dni: dniBeneficiario, 
-                            numero_acompanante: 100 + numPosicion,     
+                            numero_acompanante: siguienteRanuraLibreCompanero,     
                             nombre: "", apellidos: "", dni: null, parentesco: "Otros",
                             es_excepcion: false, motivo_excepcion: null,
                             zona_discapacidad: requiereZonaAdaptada, fecha_nacimiento: null, edad_actual: null,
@@ -449,7 +479,6 @@
                         });
 
                     } else {
-                        // Guardado reglamentario normal
                         const nombre = card.querySelector('.inv-nombre').value.trim();
                         const apellidos = card.querySelector('.inv-apellidos').value.trim();
                         const dni = card.querySelector('.inv-dni').value.trim().toUpperCase();
@@ -512,8 +541,8 @@
 
                         let remitente = null;
                         if (tipoTarjeta === "recibida") {
-                            const badgeText = card.querySelector('.titulo-tarjeta-prioridad').nextElementSibling.innerText;
-                            remitente = badgeText.replace('Recibida de: ', '');
+                            const badgeEl = card.querySelector('.capa-remitente-tag');
+                            if (badgeEl) remitente = badgeEl.innerText.replace('Recibida de: ', '');
                         }
 
                         listaParaUpsert.push({
@@ -529,10 +558,9 @@
                 }
             }
 
-            Swal.fire({ title: 'Guardando cambios...', didOpen: () => Swal.showLoading(), allowOutsideClick: false });
+            Swal.fire({ title: 'Guardando en el servidor...', didOpen: () => Swal.showLoading(), allowOutsideClick: false });
 
             try {
-                // 1. Procesamos bajas de pases excepcionales removidos en caliente
                 if (idsExcepcionalesParaBorrar.length > 0) {
                     for (let slotBorrar of idsExcepcionalesParaBorrar) {
                         await _supabase
@@ -543,7 +571,6 @@
                     }
                 }
 
-                // 2. Procesamos el lote completo de inserción/actualización
                 if (listaParaUpsert.length > 0) {
                     const { error } = await _supabase
                         .from('invitados')
