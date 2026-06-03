@@ -282,6 +282,7 @@
                 ? `<span class="text-[10px] bg-emerald-200 text-emerald-800 font-bold px-2 py-0.5 rounded-lg capa-remitente-tag">Recibida de: ${datos?.cedido_por_dni || ''}</span>`
                 : (tipoTarjeta === "excepcional" ? `<span class="text-[10px] bg-amber-200 text-amber-800 font-bold px-2 py-0.5 rounded-lg">Pase Excepcional</span>` : '');
 
+            // CORREGIDO: Se añade la opción neutra deshabilitada por defecto para limpiar el valor inicial
             card.innerHTML = `
                 <div class="flex justify-between items-center border-b pb-2 mb-2 ${tipoTarjeta === 'recibida' ? 'border-emerald-200' : (tipoTarjeta === 'excepcional' ? 'border-amber-200' : 'border-gray-200')}">
                     <span class="titulo-tarjeta-prioridad text-xs uppercase font-extrabold tracking-wider ${tipoTarjeta === 'recibida' ? 'text-emerald-700' : (tipoTarjeta === 'excepcional' ? 'text-amber-700' : 'text-gray-500')}">
@@ -383,7 +384,6 @@
             const requiereZonaAdaptadaGrupo = document.getElementById('check-discapacidad').checked;
             const tarjetas = document.querySelectorAll('.tarjeta-dinamica');
             
-            // ESCANEO DE ARRASTRE FAMILIAR (Ignora las tarjetas que se van a ceder)
             let algunInvitadoRequiereMovilidad = requiereZonaAdaptadaGrupo;
 
             const listaParaUpsert = [];
@@ -475,9 +475,9 @@
                         const fechaNac = card.querySelector('.inv-fecha-nacimiento').value;
                         const parentesco = card.querySelector('.inv-parentesco').value;
 
-                        if (nombre || apellidos || dni || fechaNac || parentesco) {
+                        if (nombre || apellidos) {
                             if (!nombre || !apellidos || !dni || !fechaNac || !parentesco) {
-                                Swal.fire('Atención', `Por favor, completa los datos del Acompañante ${indexVisual}.`, 'warning');
+                                Swal.fire('Atención', `Por favor, completa todos los campos del Acompañante ${indexVisual}.`, 'warning');
                                 return;
                             }
                             if (!validarDniNie(dni)) {
@@ -515,7 +515,7 @@
                     const parentesco = card.querySelector('.inv-parentesco').value;
                     const motivo = tipoTarjeta === "excepcional" ? card.querySelector('.inv-motivo').value.trim() : null;
 
-                    // Si el usuario ha rellenado activamente Nombre o Apellidos, validamos e insertamos
+                    // CORREGIDO: Se evalúa estrictamente basándose en si se ha empezado a escribir Nombre o Apellido, ignorando el valor por defecto del select
                     if (nombre || apellidos) {
                         if (!nombre || !apellidos || !dni || !fechaNac || !parentesco) {
                             Swal.fire('Atención', `Completa todos los campos obligatorios del formulario.`, 'warning');
@@ -548,9 +548,7 @@
                             fecha_nacimiento: fechaNac, edad_actual: edadCalculada,
                             cedido_por_dni: remitente
                         });
-                    } 
-                    // SOLUCIÓN AL FALLO: Si la tarjeta recibida está vacía, simplemente NO la añadimos a listaParaUpsert.
-                    // Al ignorarla, no machacamos el registro de Supabase y el código no se queda "pensando".
+                    }
                 }
             }
 
@@ -574,7 +572,7 @@
 
                 Swal.fire({
                     title: '¡Todo guardado!',
-                    text: 'Los cambios de tus pases se han sincronizado con éxito de forma independiente.',
+                    text: 'Los pases se han guardado con éxito y de manera independiente.',
                     icon: 'success',
                     confirmButtonColor: '#4f46e5'
                 }).then(() => {
