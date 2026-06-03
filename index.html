@@ -282,7 +282,9 @@
                 ? `<span class="text-[10px] bg-emerald-200 text-emerald-800 font-bold px-2 py-0.5 rounded-lg capa-remitente-tag">Recibida de: ${datos?.cedido_por_dni || ''}</span>`
                 : (tipoTarjeta === "excepcional" ? `<span class="text-[10px] bg-amber-200 text-amber-800 font-bold px-2 py-0.5 rounded-lg">Pase Excepcional</span>` : '');
 
-            // CORREGIDO: Se añade la opción neutra deshabilitada por defecto para limpiar el valor inicial
+            // SE SOLUCIONA LA RECARGA: Si no hay valor en la BD para el parentesco, se fuerza que se quede seleccionado el marcador neutro informativo
+            const parentescoActual = datos?.parentesco || "";
+
             card.innerHTML = `
                 <div class="flex justify-between items-center border-b pb-2 mb-2 ${tipoTarjeta === 'recibida' ? 'border-emerald-200' : (tipoTarjeta === 'excepcional' ? 'border-amber-200' : 'border-gray-200')}">
                     <span class="titulo-tarjeta-prioridad text-xs uppercase font-extrabold tracking-wider ${tipoTarjeta === 'recibida' ? 'text-emerald-700' : (tipoTarjeta === 'excepcional' ? 'text-amber-700' : 'text-gray-500')}">
@@ -307,12 +309,12 @@
                     </div>
 
                     <select class="inv-parentesco w-full p-3 text-sm border rounded-lg bg-white focus:outline-none">
-                        <option value="" disabled ${!datos ? 'selected' : ''}>Selecciona parentesco</option>
-                        <option value="Pareja" ${datos && datos.parentesco === 'Pareja' ? 'selected' : ''}>Pareja</option>
-                        <option value="Hijo/a" ${datos && datos.parentesco === 'Hijo/a' ? 'selected' : ''}>Hijo/a</option>
-                        <option value="Padre/Madre" ${datos && datos.parentesco === 'Padre/Madre' ? 'selected' : ''}>Padre/Madre</option>
-                        <option value="Hermano/a" ${datos && datos.parentesco === 'Hermano/a' ? 'selected' : ''}>Hermano/a</option>
-                        <option value="Otros" ${datos && datos.parentesco === 'Otros' ? 'selected' : ''}>Otro</option>
+                        <option value="" disabled ${parentescoActual === "" ? "selected" : ""}>Selecciona parentesco</option>
+                        <option value="Pareja" ${parentescoActual === 'Pareja' ? 'selected' : ''}>Pareja</option>
+                        <option value="Hijo/a" ${parentescoActual === 'Hijo/a' ? 'selected' : ''}>Hijo/a</option>
+                        <option value="Padre/Madre" ${parentescoActual === 'Padre/Madre' ? 'selected' : ''}>Padre/Madre</option>
+                        <option value="Hermano/a" ${parentescoActual === 'Hermano/a' ? 'selected' : ''}>Hermano/a</option>
+                        <option value="Otros" ${parentescoActual === 'Otros' ? 'selected' : ''}>Otro</option>
                     </select>
 
                     ${tipoTarjeta === "excepcional" ? `
@@ -446,7 +448,7 @@
                         }
 
                         mapaContadoresExtrasPorCompanero[dniBeneficiario]++;
-                        const siguienteRanuraLibreCompanero = mapaContadoresExtrasPorCompanero[dniBeneficiario];
+                        constPlatformRanura = mapaContadoresExtrasPorCompanero[dniBeneficiario];
 
                         listaParaUpsert.push({
                             titular_dni: usuarioDni, 
@@ -460,7 +462,7 @@
 
                         listaParaUpsert.push({
                             titular_dni: dniBeneficiario, 
-                            numero_acompanante: siguienteRanuraLibreCompanero,     
+                            numero_acompanante: constPlatformRanura,     
                             nombre: "", apellidos: "", dni: null, parentesco: "Otros",
                             es_excepcion: false, motivo_excepcion: null,
                             zona_discapacidad: false, 
@@ -473,11 +475,12 @@
                         const apellidos = card.querySelector('.inv-apellidos').value.trim();
                         const dni = card.querySelector('.inv-dni').value.trim().toUpperCase();
                         const fechaNac = card.querySelector('.inv-fecha-nacimiento').value;
-                        const parentesco = card.querySelector('.inv-parentesco').value;
+                        const parentesco = card.querySelector('.inv-parentesco').value || "Otros";
 
+                        // El gatillo inequívoco de que se está rellenando la tarjeta es que se escriba Nombre o Apellido
                         if (nombre || apellidos) {
-                            if (!nombre || !apellidos || !dni || !fechaNac || !parentesco) {
-                                Swal.fire('Atención', `Por favor, completa todos los campos del Acompañante ${indexVisual}.`, 'warning');
+                            if (!nombre || !apellidos || !dni || !fechaNac || !card.querySelector('.inv-parentesco').value) {
+                                Swal.fire('Atención', `Por favor, completa todos los campos obligatorios del Acompañante ${indexVisual}.`, 'warning');
                                 return;
                             }
                             if (!validarDniNie(dni)) {
@@ -515,7 +518,7 @@
                     const parentesco = card.querySelector('.inv-parentesco').value;
                     const motivo = tipoTarjeta === "excepcional" ? card.querySelector('.inv-motivo').value.trim() : null;
 
-                    // CORREGIDO: Se evalúa estrictamente basándose en si se ha empezado a escribir Nombre o Apellido, ignorando el valor por defecto del select
+                    // CORRECCIÓN DEFINITIVA: Ignoramos el valor por defecto del select "Otros". Solo valida si hay texto en Nombre/Apellido.
                     if (nombre || apellidos) {
                         if (!nombre || !apellidos || !dni || !fechaNac || !parentesco) {
                             Swal.fire('Atención', `Completa todos los campos obligatorios del formulario.`, 'warning');
