@@ -314,8 +314,8 @@
                     
                     <select class="inv-tratamiento w-full p-3 text-sm border rounded-lg bg-white focus:outline-none text-gray-500 font-medium">
                         <option value="" disabled ${tratamientoActual === "" ? "selected" : ""}>Tratamiento</option>
-                        <option value="Sr. D." ${tratamientoActual === 'Sr. D.' ? 'selected' : 'text-gray-800'}>Sr. D.</option>
-                        <option value="Sra. Dª." ${tratamientoActual === 'Sra. Dª.' ? 'selected' : 'text-gray-800'}>Sra. Dª.</option>
+                        <option value="Sr. D." ${tratamientoActual === 'Sr. D.' ? 'selected' : ''}>Sr. D.</option>
+                        <option value="Sra. Dª." ${tratamientoActual === 'Sra. Dª.' ? 'selected' : ''}>Sra. Dª.</option>
                     </select>
 
                     <input type="text" placeholder="Nombre" class="inv-nombre w-full p-3 text-sm border rounded-lg focus:outline-none" value="${datos ? (datos.nombre || '') : ''}">
@@ -346,7 +346,6 @@
             `;
             container.appendChild(card);
             
-            // Forzamos el color del texto del select al cambiar su valor para que pase a negro tras elegir opción
             const selectEl = card.querySelector('.inv-tratamiento');
             selectEl.addEventListener('change', function() {
                 this.classList.remove('text-gray-500');
@@ -366,6 +365,7 @@
             const capaDatos = card.querySelector('.capa-datos-familiares');
             
             if(check.checked) {
+                capaDni.remove('hidden');
                 capaDni.classList.remove('hidden');
                 capaDatos.classList.add('hidden');
             } else {
@@ -505,7 +505,7 @@
                         });
 
                     } else {
-                        const tratamiento = card.querySelector('.inv-tratamiento').value;
+                        const tratamiento = card.querySelector('.inv-tratamiento').value || null;
                         const nombre = card.querySelector('.inv-nombre').value.trim();
                         const apellidos = card.querySelector('.inv-apellidos').value.trim();
                         const dni = card.querySelector('.inv-dni').value.trim().toUpperCase();
@@ -534,6 +534,7 @@
                                 cedido_por_dni: null
                             });
                         } else {
+                            // BLINDAJE CORREGIDO: Mapeamos el tratamiento como NULL explícito para que no colisione con el esquema de Supabase al vaciar tarjetas
                             listaParaUpsert.push({
                                 titular_dni: usuarioDni, numero_acompanante: numPosicion,
                                 nombre: null, apellidos: null, dni: null, parentesco: null, tratamiento: null,
@@ -545,7 +546,7 @@
                     }
                 } 
                 else if (tipoTarjeta === "recibida" || tipoTarjeta === "excepcional") {
-                    const tratamiento = card.querySelector('.inv-tratamiento').value;
+                    const tratamiento = card.querySelector('.inv-tratamiento').value || null;
                     const nombre = card.querySelector('.inv-nombre').value.trim();
                     const apellidos = card.querySelector('.inv-apellidos').value.trim();
                     const dni = card.querySelector('.inv-dni').value.trim().toUpperCase();
