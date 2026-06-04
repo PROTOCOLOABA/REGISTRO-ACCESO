@@ -37,7 +37,7 @@
                 <span class="text-xs uppercase font-bold text-indigo-500 tracking-wider">Titular Autorizado</span>
                 <h2 id="nombre-titular" class="text-xl font-bold text-gray-800">Cargando...</h2>
                 <p class="text-xs text-gray-600 mt-2 font-medium leading-relaxed">
-                    Gestiona tus acompañantes por orden de prioridad. Las invitaciones que cedas quedarán bloqueadas. Si marcas movilidad reducida, afectará a toda tu unidad familiar activa.
+                    Gestiona tus acompañantes por orden de prioridad. Las invitaciones que cedas quedarán bloqueadas en tu panel. Puedes solicitar pases excepcionales si fuera necesario.
                 </p>
             </div>
 
@@ -47,7 +47,7 @@
 
                 <div class="flex justify-center pt-2">
                     <button type="button" onclick="crearTarjetaExcepcionalVacia()" class="w-full border-2 border-dashed border-amber-400 text-amber-800 bg-amber-50/60 font-bold p-3 rounded-xl flex items-center justify-center gap-2 hover:bg-amber-100 transition-colors text-sm shadow-sm">
-                        <span>➕ Solicitar Caso Excepcional</span>
+                        <span>➕ Solicitar Invitación Excepcional</span>
                     </button>
                 </div>
 
@@ -256,9 +256,10 @@
                 botonEliminar = `<button type="button" onclick="eliminarTarjetaExcepcional(this)" class="text-red-500 font-bold text-xs bg-red-50 px-2 py-1 rounded-lg border border-red-200 hover:bg-red-100 transition-colors">Eliminar</button>`;
             } else if (tipoTarjeta === "propia") {
                 if (yaCedidaHaciaAfuera) {
+                    // DETALLE ESTÉTICO: Cabecera simplificada a "🔒 Pase Cedido" manteniendo la nota original intacta abajo
                     bloqueCeder = `
                         <div class="bg-amber-100/70 p-3 rounded-lg border border-amber-200 text-xs font-bold text-amber-900 flex flex-col gap-1">
-                            <span>🔒 Pase Cedido y Congelado</span>
+                            <span>🔒 Pase Cedido</span>
                             <span class="font-normal text-amber-700">Has transferido este pase al compañero con DNI: <span class="font-mono font-bold text-indigo-900">${datos.cedido_por_dni}</span>.</span>
                         </div>
                     `;
@@ -280,9 +281,9 @@
 
             const badgeCabecera = tipoTarjeta === "recibida" 
                 ? `<span class="text-[10px] bg-emerald-200 text-emerald-800 font-bold px-2 py-0.5 rounded-lg capa-remitente-tag">Recibida de: ${datos?.cedido_por_dni || ''}</span>`
-                : (tipoTarjeta === "excepcional" ? `<span class="text-[10px] bg-amber-200 text-amber-800 font-bold px-2 py-0.5 rounded-lg">Pase Excepcional</span>` : '');
+                : (tipoTarjeta === "excepcional" ? `<span class="text-[10px] bg-amber-200 text-amber-800 font-bold px-2 py-0.5 rounded-lg">Invitación Excepcional</span>` : '');
 
-            // CONTROL DEFENSIVO: Si viene null, vacío o "Otros" en una tarjeta sin nombre, se limpia para forzar el indicador neutro
+            // BLINDAJE DE LA RECARGA: Limpia parentescos automáticos espurios si la tarjeta no tiene nombre real guardado
             const parentescoBBDD = datos?.parentesco || "";
             const tieneNombreYApellidos = datos?.nombre && datos?.apellidos;
             const parentescoActual = (parentescoBBDD === "Otros" && !tieneNombreYApellidos) ? "" : parentescoBBDD;
@@ -321,8 +322,8 @@
 
                     ${tipoTarjeta === "excepcional" ? `
                         <div class="mt-1">
-                            <label class="block text-[11px] font-bold text-amber-800 uppercase tracking-wider mb-1 ml-1">Justificación del Caso Excepcional</label>
-                            <textarea placeholder="Explica el caso..." class="inv-motivo w-full p-3 text-xs border border-amber-300 rounded-lg bg-white focus:outline-none" rows="2">${datos ? (datos.motivo_excepcion || '') : ''}</textarea>
+                            <label class="block text-[11px] font-bold text-amber-800 uppercase tracking-wider mb-1 ml-1">Justificación breve de la invitación excepcional</label>
+                            <textarea placeholder="Explica brevemente el motivo..." class="inv-motivo w-full p-3 text-xs border border-amber-300 rounded-lg bg-white focus:outline-none" rows="2">${datos ? (datos.motivo_excepcion || '') : ''}</textarea>
                         </div>
                     ` : ''}
                 </div>
@@ -369,7 +370,8 @@
                         tituloSpan.innerText = `Pase Extra ${contadorExtra}`;
                         contadorExtra++;
                     } else if (tipo === "excepcional") {
-                        tituloSpan.innerText = `Caso Excepcional ${contadorExcepcional}`;
+                        // DETALLE ESTÉTICO: Cabecera unificada a "Invitación Excepcional X"
+                        tituloSpan.innerText = `Invitación Excepcional ${contadorExcepcional}`;
                         contadorExcepcional++;
                     }
                 }
@@ -479,7 +481,7 @@
                         const fechaNac = card.querySelector('.inv-fecha-nacimiento').value;
                         const parentesco = card.querySelector('.inv-parentesco').value;
 
-                        // Se evalúa de manera estricta por texto escrito
+                        // Gatillo de validación estricto por texto
                         if (nombre || apellidos) {
                             if (!nombre || !apellidos || !dni || !fechaNac || !parentesco) {
                                 Swal.fire('Atención', `Por favor, completa todos los campos obligatorios del Acompañante ${indexVisual}.`, 'warning');
@@ -502,7 +504,7 @@
                                 cedido_por_dni: null
                             });
                         } else {
-                            // CORRECCIÓN CLAVE: Las ranuras base que se guarden vacías inyectan NULL en parentesco
+                            // BLINDAJE: Si la tarjeta se guarda vacía, inserta NULL para conservar el marcador de "Selecciona parentesco"
                             listaParaUpsert.push({
                                 titular_dni: usuarioDni, numero_acompanante: numPosicion,
                                 nombre: null, apellidos: null, dni: null, parentesco: null,
@@ -521,6 +523,7 @@
                     const parentesco = card.querySelector('.inv-parentesco').value;
                     const motivo = tipoTarjeta === "excepcional" ? card.querySelector('.inv-motivo').value.trim() : null;
 
+                    // El guardado parcial ignora las tarjetas vacías sin lanzar validaciones molestas
                     if (nombre || apellidos) {
                         if (!nombre || !apellidos || !dni || !fechaNac || !parentesco) {
                             Swal.fire('Atención', `Completa todos los campos obligatorios del formulario.`, 'warning');
@@ -531,7 +534,7 @@
                             return;
                         }
                         if (tipoTarjeta === "excepcional" && !motivo) {
-                            Swal.fire('Justificación Obligatoria', `Es obligatorio rellenar la justificación del caso excepcional.`, 'warning');
+                            Swal.fire('Justificación Obligatoria', `Es obligatorio rellenar la justificación de la invitación excepcional.`, 'warning');
                             return;
                         }
 
