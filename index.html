@@ -278,9 +278,9 @@
                 }
             }
 
-            // UNIFICACIÓN EN CABECERA: Eliminamos el texto duplicado fuera del badge. Todo el título dinámico va dentro de su contenedor de color.
+            // CORREGIDO: El badge verde ahora muestra "Invitación Extra --" cumpliendo estrictamente lo acordado
             const badgeCabeceraHTML = tipoTarjeta === "recibida" 
-                ? `<span class="titulo-tarjeta-prioridad text-[11px] bg-emerald-200 text-emerald-800 font-bold px-2 py-1 rounded-lg capa-remitente-tag">Pase Extra -- (Recibida de: ${datos?.cedido_por_dni || ''})</span>`
+                ? `<span class="titulo-tarjeta-prioridad text-[11px] bg-emerald-200 text-emerald-800 font-bold px-2 py-1 rounded-lg capa-remitente-tag">Invitación Extra -- (Recibida de: ${datos?.cedido_por_dni || ''})</span>`
                 : (tipoTarjeta === "excepcional" ? `<span class="titulo-tarjeta-prioridad text-[11px] bg-amber-200 text-amber-800 font-bold px-2 py-1 rounded-lg">Invitación Excepcional --</span>` : `<span class="titulo-tarjeta-prioridad text-xs uppercase font-extrabold tracking-wider text-gray-500">Acompañante --</span>`);
 
             const parentescoBBDD = datos?.parentesco || "";
@@ -363,14 +363,13 @@
                         tituloSpan.innerText = `Acompañante ${contadorPropio}`;
                         contadorPropio++;
                     } else if (tipo === "recibida") {
-                        // Resetea el texto inyectándolo todo de forma limpia y exclusiva dentro de la etiqueta verde
+                        // CORREGIDO: Mapea dinámicamente y con precisión el título unificado a "Invitación Extra X"
                         const textoCompleto = tituloSpan.innerText;
                         const matchRemitente = textoCompleto.match(/Recibida de: [^)]+/);
                         const txtRemitente = matchRemitente ? matchRemitente[0] : '';
-                        tituloSpan.innerText = `Pase Extra ${contadorExtra} ${txtRemitente ? '(' + txtRemitente + ')' : ''}`;
+                        tituloSpan.innerText = `Invitación Extra ${contadorExtra} ${txtRemitente ? '(' + txtRemitente + ')' : ''}`;
                         contadorExtra++;
                     } else if (tipo === "excepcional") {
-                        // SOLUCIONADO DEFINITIVO: Cambia únicamente el texto interior del recuadro amarillo
                         tituloSpan.innerText = `Invitación Excepcional ${contadorExcepcional}`;
                         contadorExcepcional++;
                     }
