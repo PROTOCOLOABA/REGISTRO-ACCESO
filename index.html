@@ -359,13 +359,13 @@
             reordenarTitulosVisuales();
         }
 
-        // CORREGIDO: Limpiada por completo la errata que rompía el despliegue del DNI al ceder
+        // LIMPIEZA ESTRUCTURAL: Comportamiento nativo e infalible para ocultar y mostrar cajas al ceder
         function conmutarCesion(check) {
             const card = check.closest('.tarjeta-dinamica');
             const capaDni = card.querySelector('.capa-dni-companero');
             const capaDatos = card.querySelector('.capa-datos-familiares');
             
-            if(check.checked) {
+            if (check.checked) {
                 capaDni.classList.remove('hidden');
                 capaDatos.classList.add('hidden');
             } else {
@@ -419,8 +419,8 @@
 
             const requiereZonaAdaptadaGrupo = document.getElementById('check-discapacidad').checked;
             const tarjetas = document.querySelectorAll('.tarjeta-dinamica');
-            
             let algunInvitadoRequiereMovilidad = requiereZonaAdaptadaGrupo;
+
             const listaParaUpsert = [];
             const idsExcepcionalesParaBorrar = [];
             const mapaContadoresExtrasPorCompanero = {};
@@ -440,7 +440,6 @@
                 }
 
                 if (estaBloqueada) continue;
-
                 indexVisual++;
 
                 if (tipoTarjeta === "propia") {
@@ -609,7 +608,7 @@
 
                 Swal.fire({
                     title: '¡Todo guardado!',
-                    text: 'Los pases se han guardado con éxito y de manera independiente.',
+                    text: 'Los pases se han guardado con éxito.',
                     icon: 'success',
                     confirmButtonColor: '#4f46e5'
                 }).then(() => {
