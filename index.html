@@ -37,7 +37,7 @@
                 <span class="text-xs uppercase font-bold text-indigo-500 tracking-wider">Titular Autorizado</span>
                 <h2 id="nombre-titular" class="text-xl font-bold text-gray-800">Cargando...</h2>
                 <p class="text-xs text-gray-600 mt-2 font-medium leading-relaxed">
-                    Gestiona tus acompañantes por orden de prioridad. Las invitaciones que cedas quedarán bloqueadas en tu panel. Puedes solicitar pases excepcionales si fuera necesario.
+                    Gestiona tus acompañantes por orden de prioridad. Las invitaciones que cedas quedarán bloqueadas.
                 </p>
             </div>
 
@@ -220,7 +220,7 @@
             });
 
             excepcionalesGuardadas.forEach(invExcep => {
-                crearTarjetaEnPantalla(invExcep, invExcep.numero_acompanante, "excepcional");
+                crearTarjetaEnPantacle(invExcep, invExcep.numero_acompanante, "excepcional");
             });
 
             reordenarTitulosVisuales();
@@ -256,7 +256,6 @@
                 botonEliminar = `<button type="button" onclick="eliminarTarjetaExcepcional(this)" class="text-red-500 font-bold text-xs bg-red-50 px-2 py-1 rounded-lg border border-red-200 hover:bg-red-100 transition-colors">Eliminar</button>`;
             } else if (tipoTarjeta === "propia") {
                 if (yaCedidaHaciaAfuera) {
-                    // DETALLE ESTÉTICO: Cabecera simplificada a "🔒 Pase Cedido" manteniendo la nota original intacta abajo
                     bloqueCeder = `
                         <div class="bg-amber-100/70 p-3 rounded-lg border border-amber-200 text-xs font-bold text-amber-900 flex flex-col gap-1">
                             <span>🔒 Pase Cedido</span>
@@ -283,7 +282,6 @@
                 ? `<span class="text-[10px] bg-emerald-200 text-emerald-800 font-bold px-2 py-0.5 rounded-lg capa-remitente-tag">Recibida de: ${datos?.cedido_por_dni || ''}</span>`
                 : (tipoTarjeta === "excepcional" ? `<span class="text-[10px] bg-amber-200 text-amber-800 font-bold px-2 py-0.5 rounded-lg">Invitación Excepcional</span>` : '');
 
-            // BLINDAJE DE LA RECARGA: Limpia parentescos automáticos espurios si la tarjeta no tiene nombre real guardado
             const parentescoBBDD = datos?.parentesco || "";
             const tieneNombreYApellidos = datos?.nombre && datos?.apellidos;
             const parentescoActual = (parentescoBBDD === "Otros" && !tieneNombreYApellidos) ? "" : parentescoBBDD;
@@ -370,7 +368,6 @@
                         tituloSpan.innerText = `Pase Extra ${contadorExtra}`;
                         contadorExtra++;
                     } else if (tipo === "excepcional") {
-                        // DETALLE ESTÉTICO: Cabecera unificada a "Invitación Excepcional X"
                         tituloSpan.innerText = `Invitación Excepcional ${contadorExcepcional}`;
                         contadorExcepcional++;
                     }
@@ -481,7 +478,6 @@
                         const fechaNac = card.querySelector('.inv-fecha-nacimiento').value;
                         const parentesco = card.querySelector('.inv-parentesco').value;
 
-                        // Gatillo de validación estricto por texto
                         if (nombre || apellidos) {
                             if (!nombre || !apellidos || !dni || !fechaNac || !parentesco) {
                                 Swal.fire('Atención', `Por favor, completa todos los campos obligatorios del Acompañante ${indexVisual}.`, 'warning');
@@ -504,7 +500,6 @@
                                 cedido_por_dni: null
                             });
                         } else {
-                            // BLINDAJE: Si la tarjeta se guarda vacía, inserta NULL para conservar el marcador de "Selecciona parentesco"
                             listaParaUpsert.push({
                                 titular_dni: usuarioDni, numero_acompanante: numPosicion,
                                 nombre: null, apellidos: null, dni: null, parentesco: null,
@@ -523,7 +518,6 @@
                     const parentesco = card.querySelector('.inv-parentesco').value;
                     const motivo = tipoTarjeta === "excepcional" ? card.querySelector('.inv-motivo').value.trim() : null;
 
-                    // El guardado parcial ignora las tarjetas vacías sin lanzar validaciones molestas
                     if (nombre || apellidos) {
                         if (!nombre || !apellidos || !dni || !fechaNac || !parentesco) {
                             Swal.fire('Atención', `Completa todos los campos obligatorios del formulario.`, 'warning');
