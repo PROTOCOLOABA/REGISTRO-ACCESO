@@ -17,6 +17,7 @@
             <p class="text-indigo-200 text-sm mt-1">Confirmación y Gestión de Invitados</p>
         </header>
 
+        <!-- PANTALLA 1: LOGIN -->
         <div id="pantalla-login" class="p-6 flex-grow flex flex-col justify-center items-center">
             <div class="w-full space-y-4">
                 <div class="text-center mb-6">
@@ -32,6 +33,7 @@
             </div>
         </div>
 
+        <!-- PANTALLA 2: FORMULARIO -->
         <div id="pantalla-formulario" class="p-6 flex-grow hidden space-y-6">
             <div class="bg-indigo-50 p-4 rounded-xl border border-indigo-100">
                 <span class="text-xs uppercase font-bold text-indigo-500 tracking-wider">Titular Autorizado</span>
@@ -43,14 +45,17 @@
 
             <form id="form-invitados" onsubmit="guardarDatos(event)" class="space-y-6">
                 
+                <!-- CONTENEDOR DE TARJETAS DINÁMICAS (BASE, CEDIDAS Y EXCEPCIONALES) -->
                 <div id="lista-invitados" class="space-y-4"></div>
 
+                <!-- BOTONERA DE SOLICITUD -->
                 <div class="flex justify-center pt-2">
                     <button type="button" onclick="crearTarjetaExcepcionalVacia()" class="w-full border-2 border-dashed border-amber-400 text-amber-800 bg-amber-50/60 font-bold p-3 rounded-xl flex items-center justify-center gap-2 hover:bg-amber-100 transition-colors text-sm shadow-sm">
                         <span>➕ Solicitar Invitación Excepcional</span>
                     </button>
                 </div>
 
+                <!-- CASILLA GLOBAL PARA MOVILIDAD REDUCIDA -->
                 <div class="bg-blue-50 p-4 rounded-xl border border-blue-200 mt-4">
                     <div class="flex items-start">
                         <div class="flex items-center h-5">
@@ -65,6 +70,7 @@
                     </div>
                 </div>
 
+                <!-- CASILLA LEGAL LOPD -->
                 <div class="bg-gray-50 p-4 rounded-xl border border-gray-200">
                     <div class="flex items-start">
                         <div class="flex items-center h-5">
@@ -92,10 +98,22 @@
     <script>
         const SUPABASE_URL = "https://nebtkwgebbgenmlysnui.supabase.co";
         const SUPABASE_KEY = "sb_publishable_zCd7omi4D9AK2rAXlTEvmw_UwKYo0d_";
-        const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-
+        
+        // Creamos una variable global para almacenar el cliente autenticado por DNI
+        let _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
         let usuarioDni = "";
         let maxRanuraExcepcionales = 1000;
+
+        // Función clave para actualizar las cabeceras e identificarse ante el RLS de Supabase
+        function inicializarSupabaseConDni(dni) {
+            _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
+                global: {
+                    headers: {
+                        'x-user-dni': dni
+                    }
+                }
+            });
+        }
 
         function validarDniNie(documento) {
             const regex = /^[XYZ\d]\d{7}[A-Z]$/i;
@@ -151,6 +169,9 @@
             Swal.fire({ title: 'Buscando tu registro...', didOpen: () => Swal.showLoading(), allowOutsideClick: false });
 
             try {
+                // Pre-inyectamos el DNI en la cabecera antes de lanzar la búsqueda para saltar el RLS
+                inicializarSupabaseConDni(inputDni);
+
                 const { data: titular, error } = await _supabase
                     .from('titulares')
                     .select('*')
@@ -278,7 +299,6 @@
                 }
             }
 
-            // CORREGIDO: El badge verde ahora muestra "Invitación Extra --" cumpliendo estrictamente lo acordado
             const badgeCabeceraHTML = tipoTarjeta === "recibida" 
                 ? `<span class="titulo-tarjeta-prioridad text-[11px] bg-emerald-200 text-emerald-800 font-bold px-2 py-1 rounded-lg capa-remitente-tag">Invitación Extra -- (Recibida de: ${datos?.cedido_por_dni || ''})</span>`
                 : (tipoTarjeta === "excepcional" ? `<span class="titulo-tarjeta-prioridad text-[11px] bg-amber-200 text-amber-800 font-bold px-2 py-1 rounded-lg">Invitación Excepcional --</span>` : `<span class="titulo-tarjeta-prioridad text-xs uppercase font-extrabold tracking-wider text-gray-500">Acompañante --</span>`);
@@ -363,7 +383,6 @@
                         tituloSpan.innerText = `Acompañante ${contadorPropio}`;
                         contadorPropio++;
                     } else if (tipo === "recibida") {
-                        // CORREGIDO: Mapea dinámicamente y con precisión el título unificado a "Invitación Extra X"
                         const textoCompleto = tituloSpan.innerText;
                         const matchRemitente = textoCompleto.match(/Recibida de: [^)]+/);
                         const txtRemitente = matchRemitente ? matchRemitente[0] : '';
@@ -526,7 +545,7 @@
                             return;
                         }
                         if (!validarDniNie(dni)) {
-                            Swal.fire('DNI Incorrecto', `El DNI introducido no tiene un formato válido.`, 'error');
+                            Swal.fire('DNI Incorrecto', `El DNI introducido no tiene un format válido.`, 'error');
                             return;
                         }
                         if (tipoTarjeta === "excepcional" && !motivo) {
