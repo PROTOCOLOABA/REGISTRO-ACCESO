@@ -278,10 +278,10 @@
                 }
             }
 
-            // UNIFICACIÓN EN LA CABECERA: El badge ahora contiene el texto completo "Acompañante X", "Pase Extra X" o "Invitación Excepcional X" de manera compacta
+            // UNIFICACIÓN EN CABECERA: Eliminamos el texto duplicado fuera del badge. Todo el título dinámico va dentro de su contenedor de color.
             const badgeCabeceraHTML = tipoTarjeta === "recibida" 
-                ? `<span class="titulo-tarjeta-prioridad text-[10px] bg-emerald-200 text-emerald-800 font-bold px-2 py-0.5 rounded-lg capa-remitente-tag">Pase Extra -- (Recibida de: ${datos?.cedido_por_dni || ''})</span>`
-                : (tipoTarjeta === "excepcional" ? `<span class="titulo-tarjeta-prioridad text-[10px] bg-amber-200 text-amber-800 font-bold px-2 py-0.5 rounded-lg">Invitación Excepcional --</span>` : `<span class="titulo-tarjeta-prioridad text-xs uppercase font-extrabold tracking-wider text-gray-500">Acompañante --</span>`);
+                ? `<span class="titulo-tarjeta-prioridad text-[11px] bg-emerald-200 text-emerald-800 font-bold px-2 py-1 rounded-lg capa-remitente-tag">Pase Extra -- (Recibida de: ${datos?.cedido_por_dni || ''})</span>`
+                : (tipoTarjeta === "excepcional" ? `<span class="titulo-tarjeta-prioridad text-[11px] bg-amber-200 text-amber-800 font-bold px-2 py-1 rounded-lg">Invitación Excepcional --</span>` : `<span class="titulo-tarjeta-prioridad text-xs uppercase font-extrabold tracking-wider text-gray-500">Acompañante --</span>`);
 
             const parentescoBBDD = datos?.parentesco || "";
             const tieneNombreYApellidos = datos?.nombre && datos?.apellidos;
@@ -363,14 +363,14 @@
                         tituloSpan.innerText = `Acompañante ${contadorPropio}`;
                         contadorPropio++;
                     } else if (tipo === "recibida") {
-                        // Extraemos el remitente dinámicamente si existe en el texto para no perderlo
-                        const textoContenedor = tituloSpan.innerText;
-                        const matchRemitente = textoContenedor.match(/Recibida de: [^)]+/);
+                        // Resetea el texto inyectándolo todo de forma limpia y exclusiva dentro de la etiqueta verde
+                        const textoCompleto = tituloSpan.innerText;
+                        const matchRemitente = textoCompleto.match(/Recibida de: [^)]+/);
                         const txtRemitente = matchRemitente ? matchRemitente[0] : '';
                         tituloSpan.innerText = `Pase Extra ${contadorExtra} ${txtRemitente ? '(' + txtRemitente + ')' : ''}`;
                         contadorExtra++;
                     } else if (tipo === "excepcional") {
-                        // UNIFICACIÓN COMPLETA: Ahora el número correlativo va incrustado elegantemente dentro del recuadro amarillo
+                        // SOLUCIONADO DEFINITIVO: Cambia únicamente el texto interior del recuadro amarillo
                         tituloSpan.innerText = `Invitación Excepcional ${contadorExcepcional}`;
                         contadorExcepcional++;
                     }
@@ -495,7 +495,6 @@
 
                             listaParaUpsert.push({
                                 titular_dni: usuarioDni,
-                                Bird_numero: numPosicion,
                                 numero_acompanante: numPosicion,
                                 nombre: nombre, apellidos: apellidos, dni: dni, parentesco: parentesco,
                                 es_excepcion: false, motivo_excepcion: null,
@@ -539,7 +538,6 @@
                         const edadCalculada = calcularEdadExacta(fechaNac);
 
                         let remitente = null;
-                        // Buscamos de forma segura el DNI origen en la etiqueta unificada
                         const badgeEl = card.querySelector('.capa-remitente-tag');
                         if (badgeEl) {
                             const match = badgeEl.innerText.match(/Recibida de: ([A-Za-z0-9]+)/);
