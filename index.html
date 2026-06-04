@@ -220,7 +220,7 @@
             });
 
             excepcionalesGuardadas.forEach(invExcep => {
-                crearTarjetaEnPantacle(invExcep, invExcep.numero_acompanante, "excepcional");
+                crearTarjetaEnPantalla(invExcep, invExcep.numero_acompanante, "excepcional");
             });
 
             reordenarTitulosVisuales();
@@ -278,9 +278,10 @@
                 }
             }
 
-            const badgeCabecera = tipoTarjeta === "recibida" 
-                ? `<span class="text-[10px] bg-emerald-200 text-emerald-800 font-bold px-2 py-0.5 rounded-lg capa-remitente-tag">Recibida de: ${datos?.cedido_por_dni || ''}</span>`
-                : (tipoTarjeta === "excepcional" ? `<span class="text-[10px] bg-amber-200 text-amber-800 font-bold px-2 py-0.5 rounded-lg">Invitación Excepcional</span>` : '');
+            // UNIFICACIÓN EN LA CABECERA: El badge ahora contiene el texto completo "Acompañante X", "Pase Extra X" o "Invitación Excepcional X" de manera compacta
+            const badgeCabeceraHTML = tipoTarjeta === "recibida" 
+                ? `<span class="titulo-tarjeta-prioridad text-[10px] bg-emerald-200 text-emerald-800 font-bold px-2 py-0.5 rounded-lg capa-remitente-tag">Pase Extra -- (Recibida de: ${datos?.cedido_por_dni || ''})</span>`
+                : (tipoTarjeta === "excepcional" ? `<span class="titulo-tarjeta-prioridad text-[10px] bg-amber-200 text-amber-800 font-bold px-2 py-0.5 rounded-lg">Invitación Excepcional --</span>` : `<span class="titulo-tarjeta-prioridad text-xs uppercase font-extrabold tracking-wider text-gray-500">Acompañante --</span>`);
 
             const parentescoBBDD = datos?.parentesco || "";
             const tieneNombreYApellidos = datos?.nombre && datos?.apellidos;
@@ -288,13 +289,10 @@
 
             card.innerHTML = `
                 <div class="flex justify-between items-center border-b pb-2 mb-2 ${tipoTarjeta === 'recibida' ? 'border-emerald-200' : (tipoTarjeta === 'excepcional' ? 'border-amber-200' : 'border-gray-200')}">
-                    <span class="titulo-tarjeta-prioridad text-xs uppercase font-extrabold tracking-wider ${tipoTarjeta === 'recibida' ? 'text-emerald-700' : (tipoTarjeta === 'excepcional' ? 'text-amber-700' : 'text-gray-500')}">
-                        Acompañante --
-                    </span>
                     <div class="flex items-center gap-2">
-                        ${badgeCabecera}
-                        ${botonEliminar}
+                        ${badgeCabeceraHTML}
                     </div>
+                    ${botonEliminar}
                 </div>
                 
                 ${bloqueCeder}
@@ -365,9 +363,14 @@
                         tituloSpan.innerText = `Acompañante ${contadorPropio}`;
                         contadorPropio++;
                     } else if (tipo === "recibida") {
-                        tituloSpan.innerText = `Pase Extra ${contadorExtra}`;
+                        // Extraemos el remitente dinámicamente si existe en el texto para no perderlo
+                        const textoContenedor = tituloSpan.innerText;
+                        const matchRemitente = textoContenedor.match(/Recibida de: [^)]+/);
+                        const txtRemitente = matchRemitente ? matchRemitente[0] : '';
+                        tituloSpan.innerText = `Pase Extra ${contadorExtra} ${txtRemitente ? '(' + txtRemitente + ')' : ''}`;
                         contadorExtra++;
                     } else if (tipo === "excepcional") {
+                        // UNIFICACIÓN COMPLETA: Ahora el número correlativo va incrustado elegantemente dentro del recuadro amarillo
                         tituloSpan.innerText = `Invitación Excepcional ${contadorExcepcional}`;
                         contadorExcepcional++;
                     }
@@ -492,6 +495,7 @@
 
                             listaParaUpsert.push({
                                 titular_dni: usuarioDni,
+                                Bird_numero: numPosicion,
                                 numero_acompanante: numPosicion,
                                 nombre: nombre, apellidos: apellidos, dni: dni, parentesco: parentesco,
                                 es_excepcion: false, motivo_excepcion: null,
@@ -535,9 +539,11 @@
                         const edadCalculada = calcularEdadExacta(fechaNac);
 
                         let remitente = null;
-                        if (tipoTarjeta === "recibida") {
-                            const badgeEl = card.querySelector('.capa-remitente-tag');
-                            if (badgeEl) remitente = badgeEl.innerText.replace('Recibida de: ', '');
+                        // Buscamos de forma segura el DNI origen en la etiqueta unificada
+                        const badgeEl = card.querySelector('.capa-remitente-tag');
+                        if (badgeEl) {
+                            const match = badgeEl.innerText.match(/Recibida de: ([A-Za-z0-9]+)/);
+                            if (match) remitente = match[1];
                         }
 
                         listaParaUpsert.push({
