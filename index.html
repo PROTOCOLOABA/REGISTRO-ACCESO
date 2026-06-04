@@ -359,13 +359,13 @@
             reordenarTitulosVisuales();
         }
 
+        // CORREGIDO: Limpiada por completo la errata que rompía el despliegue del DNI al ceder
         function conmutarCesion(check) {
             const card = check.closest('.tarjeta-dinamica');
             const capaDni = card.querySelector('.capa-dni-companero');
             const capaDatos = card.querySelector('.capa-datos-familiares');
             
             if(check.checked) {
-                capaDni.remove('hidden');
                 capaDni.classList.remove('hidden');
                 capaDatos.classList.add('hidden');
             } else {
@@ -421,7 +421,6 @@
             const tarjetas = document.querySelectorAll('.tarjeta-dinamica');
             
             let algunInvitadoRequiereMovilidad = requiereZonaAdaptadaGrupo;
-
             const listaParaUpsert = [];
             const idsExcepcionalesParaBorrar = [];
             const mapaContadoresExtrasPorCompanero = {};
@@ -534,7 +533,6 @@
                                 cedido_por_dni: null
                             });
                         } else {
-                            // BLINDAJE CORREGIDO: Mapeamos el tratamiento como NULL explícito para que no colisione con el esquema de Supabase al vaciar tarjetas
                             listaParaUpsert.push({
                                 titular_dni: usuarioDni, numero_acompanante: numPosicion,
                                 nombre: null, apellidos: null, dni: null, parentesco: null, tratamiento: null,
