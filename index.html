@@ -17,7 +17,6 @@
             <p class="text-indigo-200 text-sm mt-1">Confirmación y Gestión de Invitados</p>
         </header>
 
-        <!-- PANTALLA 1: LOGIN -->
         <div id="pantalla-login" class="p-6 flex-grow flex flex-col justify-center items-center">
             <div class="w-full space-y-4">
                 <div class="text-center mb-6">
@@ -27,14 +26,12 @@
                     <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Tu Documento de Identidad</label>
                     <input type="text" id="login-dni" placeholder="Ej: 12345678Z" class="w-full p-4 border-2 border-gray-300 rounded-xl text-lg font-semibold uppercase focus:border-indigo-500 focus:outline-none">
                 </div>
-                <!-- CORREGIDO: Nombre de la función arreglado aquí -->
                 <button onclick="verificarAcceso()" class="w-full bg-indigo-600 text-white font-bold p-4 rounded-xl shadow-md text-lg">
                     Acceder al Formulario
                 </button>
             </div>
         </div>
 
-        <!-- PANTALLA 2: FORMULARIO -->
         <div id="pantalla-formulario" class="p-6 flex-grow hidden space-y-6">
             <div class="bg-indigo-50 p-4 rounded-xl border border-indigo-100">
                 <span class="text-xs uppercase font-bold text-indigo-500 tracking-wider">Titular Autorizado</span>
@@ -46,17 +43,14 @@
 
             <form id="form-invitados" onsubmit="guardarDatos(event)" class="space-y-6">
                 
-                <!-- CONTENEDOR DE TARJETAS DINÁMICAS (BASE, CEDIDAS Y EXCEPCIONALES) -->
                 <div id="lista-invitados" class="space-y-4"></div>
 
-                <!-- BOTONERA DE SOLICITUD -->
                 <div class="flex justify-center pt-2">
                     <button type="button" onclick="crearTarjetaExcepcionalVacia()" class="w-full border-2 border-dashed border-amber-400 text-amber-800 bg-amber-50/60 font-bold p-3 rounded-xl flex items-center justify-center gap-2 hover:bg-amber-100 transition-colors text-sm shadow-sm">
                         <span>➕ Solicitar Invitación Excepcional</span>
                     </button>
                 </div>
 
-                <!-- CASILLA GLOBAL PARA MOVILIDAD REDUCIDA -->
                 <div class="bg-blue-50 p-4 rounded-xl border border-blue-200 mt-4">
                     <div class="flex items-start">
                         <div class="flex items-center h-5">
@@ -71,7 +65,6 @@
                     </div>
                 </div>
 
-                <!-- CASILLA LEGAL LOPD -->
                 <div class="bg-gray-50 p-4 rounded-xl border border-gray-200">
                     <div class="flex items-start">
                         <div class="flex items-center h-5">
@@ -319,13 +312,13 @@
 
                 <div class="capa-datos-familiares grid grid-cols-1 gap-2 ${yaCedidaHaciaAfuera ? 'hidden' : ''}">
                     
-                    <select class="inv-tratamiento w-full p-3 text-sm border rounded-lg bg-white focus:outline-none text-gray-700 font-medium">
-                        <option value="" disabled ${tratamientoActual === "" ? "selected" : ""}>Selecciona tratamiento (Sr. D. / Sra. Dª.)</option>
-                        <option value="Sr. D." ${tratamientoActual === 'Sr. D.' ? 'selected' : ''}>Sr. D.</option>
-                        <option value="Sra. Dª." ${tratamientoActual === 'Sra. Dª.' ? 'selected' : ''}>Sra. Dª.</option>
+                    <select class="inv-tratamiento w-full p-3 text-sm border rounded-lg bg-white focus:outline-none text-gray-500 font-medium">
+                        <option value="" disabled ${tratamientoActual === "" ? "selected" : ""}>Tratamiento</option>
+                        <option value="Sr. D." ${tratamientoActual === 'Sr. D.' ? 'selected' : 'text-gray-800'}>Sr. D.</option>
+                        <option value="Sra. Dª." ${tratamientoActual === 'Sra. Dª.' ? 'selected' : 'text-gray-800'}>Sra. Dª.</option>
                     </select>
 
-                    <input type="text" placeholder="Nombre completo" class="inv-nombre w-full p-3 text-sm border rounded-lg focus:outline-none" value="${datos ? (datos.nombre || '') : ''}">
+                    <input type="text" placeholder="Nombre" class="inv-nombre w-full p-3 text-sm border rounded-lg focus:outline-none" value="${datos ? (datos.nombre || '') : ''}">
                     <input type="text" placeholder="Apellidos" class="inv-apellidos w-full p-3 text-sm border rounded-lg focus:outline-none" value="${datos ? (datos.apellidos || '') : ''}">
                     <input type="text" placeholder="DNI / NIE del acompañante" class="inv-dni w-full p-3 text-sm border rounded-lg uppercase focus:outline-none" value="${datos && datos.dni !== 'CEDIDO' ? (datos.dni || '') : ''}">
                     
@@ -352,6 +345,18 @@
                 </div>
             `;
             container.appendChild(card);
+            
+            // Forzamos el color del texto del select al cambiar su valor para que pase a negro tras elegir opción
+            const selectEl = card.querySelector('.inv-tratamiento');
+            selectEl.addEventListener('change', function() {
+                this.classList.remove('text-gray-500');
+                this.classList.add('text-gray-800');
+            });
+            if(tratamientoActual !== "") {
+                selectEl.classList.remove('text-gray-500');
+                selectEl.classList.add('text-gray-800');
+            }
+
             reordenarTitulosVisuales();
         }
 
@@ -509,7 +514,7 @@
 
                         if (nombre || apellidos) {
                             if (!tratamiento || !nombre || !apellidos || !dni || !fechaNac || !parentesco) {
-                                Swal.fire('Atención', `Por favor, completa todos los campos obligatorios del Acompañante ${indexVisual} (incluyendo el Tratamiento).`, 'warning');
+                                Swal.fire('Atención', `Por favor, completa todos los campos obligatorios del Acompañante ${indexVisual}.`, 'warning');
                                 return;
                             }
                             if (!validarDniNie(dni)) {
@@ -550,7 +555,7 @@
 
                     if (nombre || apellidos) {
                         if (!tratamiento || !nombre || !apellidos || !dni || !fechaNac || !parentesco) {
-                            Swal.fire('Atención', `Completa todos los campos obligatorios del formulario (incluyendo el Tratamiento).`, 'warning');
+                            Swal.fire('Atención', `Completa todos los campos obligatorios del formulario.`, 'warning');
                             return;
                         }
                         if (!validarDniNie(dni)) {
